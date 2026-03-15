@@ -1,0 +1,1088 @@
+"""FlareCrawl CLI - Firecrawl-compatible CLI backed by Cloudflare Browser Rendering."""
+
+from __future__ import annotations
+
+import base64
+import concurrent.futures
+import json
+import re
+import sys
+import time as _time
+from pathlib import Path
+from typing import Annotated, Optional
+from urllib.parse import urlparse
+
+import typer
+from rich.console import Console
+from rich.live import Live
+from rich.spinner import Spinner
+from rich.table import Table
+
+from . import __version__
+from .client import Client, FlareCrawlError
+from .config import (
+    clear_credentials,
+    get_account_id,
+    get_api_token,
+    get_auth_status,
+    get_usage,
+    save_credentials,
+)
+
+app = typer.Typer(
+    name="flarecrawl",
+    help="Cloudflare Browser Rendering CLI — drop-in firecrawl replacement, much cheaper.",
+    no_args_is_help=True,
+)
+
+# stderr for human output (stdout is sacred)
+console = Console(stderr=True)
+
+# Fabric Protocol exit codes
+EXIT_SUCCESS = 0
+EXIT_ERROR = 1
+EXIT_AUTH_REQUIRED = 2
+EXIT_NOT_FOUND = 3
+EXIT_VALIDATION = 4
+EXIT_FORBIDDEN = 5
+EXIT_RATE_LIMITED = 7
+
+
+# ------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------
+
+
+def _output_json(data) -> None:
+    """Output JSON to stdout."""
+    print(json.dumps(data, indent=2, default=str))
+
+
+def _output_ndjson(record: dict) -> None:
+    """Output single JSON record (newline-delimited)."""
+    print(json.dumps(record, default=str))
+
+
+def _output_text(text: str) -> None:
+    """Output raw text to stdout."""
+    print(text)
+
+
+def _filter_fields(data, fields: str | None):
+    """Filter JSON output to only include specified fields."""
+    if not fields:
+        return data
+    keep = {f.strip() for f in fields.split(",")}
+    if isinstance(data, list):
+        return [{k: v for k, v in item.items() if k in keep} for item in data]
+    if isinstance(data, dict):
+        return {k: v for k, v in data.items() if k in keep}
+    return data
+
+
+def _error(
+    message: str,
+    code: str = "ERROR",
+    exit_code: int = EXIT_ERROR,
+    details: dict | None = None,
+    as_json: bool = False,
+) -> None:
+    """Output error and exit."""
+    error_obj = {"error": {"code": code, "message": message}}
+    if details:
+        error_obj["error"]["details"] = details
+
+    if as_json:
+        _output_json(error_obj)
+    else:
+        console.print(f"[red]Error:[/red] {message}")
+
+    raise typer.Exit(exit_code)
+
+
+def _require_auth(as_json: bool = False) -> None:
+    """Check authentication, exit if not authenticated."""
+    if not get_account_id() or not get_api_token():
+        _error(
+            "Not authenticated. Run: flarecrawl auth login",
+            "AUTH_REQUIRED",
+            EXIT_AUTH_REQUIRED,
+            as_json=as_json,
+        )
+
+
+def _handle_api_error(e: FlareCrawlError, as_json: bool = False) -> None:
+    """Map API error to Fabric exit code."""
+    code_map = {
+        "AUTH_REQUIRED": EXIT_AUTH_REQUIRED,
+        "NOT_FOUND": EXIT_NOT_FOUND,
+        "VALIDATION_ERROR": EXIT_VALIDATION,
+        "FORBIDDEN": EXIT_FORBIDDEN,
+        "RATE_LIMITED": EXIT_RATE_LIMITED,
+    }
+    exit_code = code_map.get(e.code, EXIT_ERROR)
+    _error(str(e), e.code, exit_code, as_json=as_json)
+
+
+def _validate_url(url: str, as_json: bool = False) -> None:
+    """Validate URL format."""
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        _error(
+            f"Invalid URL: {url} (must include scheme, e.g. https://)",
+            "VALIDATION_ERROR",
+            EXIT_VALIDATION,
+            {"url": url},
+            as_json,
+        )
+
+
+def _parse_body(body_str: str | None, as_json: bool = False) -> dict | None:
+    """Parse --body JSON string."""
+    if not body_str:
+        return None
+    try:
+        return json.loads(body_str)
+    except json.JSONDecodeError as e:
+        _error(
+            f"Invalid --body JSON: {e}",
+            "VALIDATION_ERROR",
+            EXIT_VALIDATION,
+            as_json=as_json,
+        )
+    return None  # unreachable
+
+
+def _sanitize_filename(url: str) -> str:
+    """Convert URL to safe filename."""
+    parsed = urlparse(url)
+    path = parsed.path.strip("/") or "index"
+    # Replace path separators and unsafe chars
+    name = re.sub(r'[^\w\-.]', '-', path)
+    name = re.sub(r'-+', '-', name).strip('-')
+    return name or "index"
+
+
+def _get_client(as_json: bool = False) -> Client:
+    """Get authenticated client."""
+    _require_auth(as_json)
+    return Client()
+
+
+# ------------------------------------------------------------------
+# Version callback
+# ------------------------------------------------------------------
+
+
+def version_callback(value: bool):
+    if value:
+        print(f"flarecrawl {__version__}")
+        raise typer.Exit()
+
+
+def status_callback(value: bool):
+    if value:
+        status = get_auth_status()
+        console.print(f"flarecrawl {__version__}")
+        console.print()
+        if status.get("authenticated"):
+            console.print(f"Auth: [green]authenticated[/green] (source: {status.get('source')})")
+            console.print(f"Account: [cyan]{status.get('account_id')}[/cyan]")
+        else:
+            console.print("Auth: [red]not authenticated[/red]")
+            console.print("Run: flarecrawl auth login")
+        console.print()
+        console.print("[dim]Pricing: Free 10 min/day, then $0.09/hr[/dim]")
+        console.print("[dim]Limits: Free 3 concurrent, Paid 10 concurrent browsers[/dim]")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: Annotated[
+        Optional[bool],
+        typer.Option("--version", "-V", callback=version_callback, is_eager=True),
+    ] = None,
+    status: Annotated[
+        Optional[bool],
+        typer.Option("--status", callback=status_callback, is_eager=True,
+                     help="Show version, auth status, and usage info"),
+    ] = None,
+):
+    """Cloudflare Browser Rendering CLI — drop-in firecrawl replacement."""
+
+
+# ------------------------------------------------------------------
+# Auth commands
+# ------------------------------------------------------------------
+
+auth_app = typer.Typer(help="Authentication")
+app.add_typer(auth_app, name="auth")
+
+
+@auth_app.command("login")
+def auth_login(
+    account_id: Annotated[
+        Optional[str], typer.Option("--account-id", help="Cloudflare account ID")
+    ] = None,
+    token: Annotated[
+        Optional[str], typer.Option("--token", help="Cloudflare API token")
+    ] = None,
+):
+    """Authenticate with Cloudflare Browser Rendering.
+
+    Create an API token at https://dash.cloudflare.com/profile/api-tokens
+    with 'Browser Rendering - Edit' permission.
+
+    Example:
+        flarecrawl auth login
+        flarecrawl auth login --account-id abc123 --token cftoken
+    """
+    if not account_id:
+        account_id = typer.prompt("Cloudflare Account ID")
+    if not token:
+        token = typer.prompt("API Token (Browser Rendering - Edit)", hide_input=True)
+
+    # Validate credentials with a lightweight test
+    console.print("Validating credentials...", style="dim")
+    try:
+        client = Client(account_id=account_id, api_token=token)
+        client.get_content(html="<h1>test</h1>")
+        console.print("[green]Credentials valid[/green]")
+    except FlareCrawlError as e:
+        console.print(f"[red]Validation failed:[/red] {e}")
+        console.print("Saving credentials anyway — they may work for other endpoints.")
+
+    save_credentials(account_id, token)
+    console.print("[green]Credentials saved[/green]")
+
+
+@auth_app.command("status")
+def auth_status(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+):
+    """Check authentication status.
+
+    Example:
+        flarecrawl auth status
+        flarecrawl auth status --json
+    """
+    status = get_auth_status()
+
+    if json_output:
+        _output_json({"data": status, "meta": {}})
+        return
+
+    if status.get("authenticated"):
+        console.print(f"Authenticated: [green]yes[/green]")
+        console.print(f"Source: [cyan]{status.get('source')}[/cyan]")
+        console.print(f"Account: [cyan]{status.get('account_id')}[/cyan]")
+    else:
+        console.print("Authenticated: [red]no[/red]")
+        missing = status.get("missing", [])
+        if missing:
+            console.print(f"Missing: {', '.join(missing)}")
+        console.print("Run: flarecrawl auth login")
+
+
+@auth_app.command("logout")
+def auth_logout():
+    """Clear stored credentials.
+
+    Example:
+        flarecrawl auth logout
+    """
+    clear_credentials()
+    console.print("[green]Logged out[/green]")
+
+
+# ------------------------------------------------------------------
+# scrape — matches firecrawl scrape
+# ------------------------------------------------------------------
+
+
+def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
+                   screenshot: bool, full_page_screenshot: bool,
+                   raw_body: dict | None, timeout_ms: int | None) -> dict:
+    """Scrape a single URL. Returns result dict. Used for concurrent scraping."""
+    start = _time.time()
+    kwargs = {}
+    if wait_for:
+        kwargs["timeout"] = wait_for
+    if timeout_ms:
+        kwargs["timeout"] = timeout_ms
+
+    if raw_body:
+        body_copy = {**raw_body, "url": url}
+        endpoint = "markdown" if format == "markdown" else "content"
+        result_data = client.post_raw(endpoint, body_copy)
+        content = result_data.get("result", result_data)
+    elif format == "links":
+        content = client.get_links(url, **kwargs)
+    elif format == "json":
+        # Route to /json endpoint for AI extraction
+        content = client.extract_json(url, prompt="Extract the main content as structured data", **kwargs)
+    elif format == "screenshot" or screenshot or full_page_screenshot:
+        if full_page_screenshot:
+            kwargs["full_page"] = True
+        binary = client.take_screenshot(url, **kwargs)
+        content = {
+            "screenshot": base64.b64encode(binary).decode(),
+            "encoding": "base64",
+            "size": len(binary),
+        }
+    elif format == "html":
+        content = client.get_content(url, **kwargs)
+    else:
+        content = client.get_markdown(url, **kwargs)
+
+    elapsed = _time.time() - start
+    return {"url": url, "content": content, "elapsed": round(elapsed, 2)}
+
+
+@app.command()
+def scrape(
+    urls: Annotated[list[str], typer.Argument(help="URL(s) to scrape")],
+    format: Annotated[
+        str,
+        typer.Option("--format", "-f", help="Output format: markdown, html, links, screenshot, json"),
+    ] = "markdown",
+    only_main_content: Annotated[bool, typer.Option("--only-main-content", help="Main content only")] = False,
+    wait_for: Annotated[Optional[int], typer.Option("--wait-for", help="Wait time in ms")] = None,
+    screenshot: Annotated[bool, typer.Option("--screenshot", help="Take screenshot")] = False,
+    full_page_screenshot: Annotated[bool, typer.Option("--full-page-screenshot", help="Full page screenshot")] = False,
+    output: Annotated[Optional[Path], typer.Option("--output", "-o", help="Output file path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    timing: Annotated[bool, typer.Option("--timing", help="Show timing info")] = False,
+    timeout: Annotated[Optional[int], typer.Option("--timeout", help="Request timeout in ms")] = None,
+    fields: Annotated[Optional[str], typer.Option("--fields", help="Comma-separated fields to include in JSON")] = None,
+    input_file: Annotated[Optional[Path], typer.Option("--input", "-i", help="File with URLs (one per line)")] = None,
+    body: Annotated[Optional[str], typer.Option("--body", help="Raw JSON body (overrides all flags)")] = None,
+):
+    """Scrape one or more URLs. Default output is markdown.
+
+    Multiple URLs are scraped concurrently (up to 3 at a time).
+
+    Example:
+        flarecrawl scrape https://example.com
+        flarecrawl scrape https://example.com --format html --json
+        flarecrawl scrape https://a.com https://b.com --json
+        flarecrawl scrape --input urls.txt --json
+    """
+    client = _get_client(json_output)
+    raw_body = _parse_body(body, json_output)
+
+    # Load URLs from file if provided
+    all_urls = list(urls)
+    if input_file:
+        try:
+            file_urls = [
+                line.strip() for line in input_file.read_text().splitlines()
+                if line.strip() and not line.strip().startswith("#")
+            ]
+            all_urls.extend(file_urls)
+        except OSError as e:
+            _error(f"Cannot read input file: {e}", "VALIDATION_ERROR", EXIT_VALIDATION, as_json=json_output)
+
+    for url in all_urls:
+        _validate_url(url, json_output)
+
+    # Single URL: binary screenshot can go to stdout/file directly
+    if len(all_urls) == 1 and (format == "screenshot" or screenshot or full_page_screenshot) and not json_output:
+        url = all_urls[0]
+        kwargs = {}
+        if full_page_screenshot:
+            kwargs["full_page"] = True
+        if wait_for:
+            kwargs["timeout"] = wait_for
+        if timeout:
+            kwargs["timeout"] = timeout
+        try:
+            binary = client.take_screenshot(url, **kwargs)
+        except FlareCrawlError as e:
+            _handle_api_error(e, json_output)
+            return
+        if output:
+            output.write_bytes(binary)
+            console.print(f"Screenshot saved: {output}")
+        else:
+            sys.stdout.buffer.write(binary)
+        return
+
+    # Concurrent scraping for multiple URLs
+    results = []
+    if len(all_urls) > 1:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            future_to_url = {
+                pool.submit(
+                    _scrape_single, client, url, format, wait_for,
+                    screenshot, full_page_screenshot, raw_body, timeout,
+                ): url
+                for url in all_urls
+            }
+            for future in concurrent.futures.as_completed(future_to_url):
+                url = future_to_url[future]
+                try:
+                    result = future.result()
+                    if timing:
+                        console.print(f"[dim]{url} — {result['elapsed']:.1f}s[/dim]")
+                    results.append(result)
+                except FlareCrawlError as e:
+                    console.print(f"[red]Failed:[/red] {url}: {e}")
+                    results.append({"url": url, "error": str(e)})
+        # Sort by original URL order
+        url_order = {u: i for i, u in enumerate(all_urls)}
+        results.sort(key=lambda r: url_order.get(r.get("url", ""), 0))
+    else:
+        # Single URL
+        url = all_urls[0]
+        try:
+            result = _scrape_single(client, url, format, wait_for, screenshot,
+                                    full_page_screenshot, raw_body, timeout)
+            if timing:
+                console.print(f"[dim]{url} — {result['elapsed']:.1f}s[/dim]")
+            results.append(result)
+        except FlareCrawlError as e:
+            _handle_api_error(e, json_output)
+            return
+
+    # Show browser time if timing enabled
+    if timing and client.browser_ms_used:
+        console.print(f"[dim]Browser time: {client.browser_ms_used}ms[/dim]")
+
+    # Output
+    if json_output:
+        data = results if len(results) > 1 else results[0]
+        if fields:
+            data = _filter_fields(data, fields)
+        meta = {"format": format}
+        if len(results) > 1:
+            meta["count"] = len(results)
+        _output_json({"data": data, "meta": meta})
+    elif output:
+        out_content = "\n\n".join(
+            r.get("content", "") if isinstance(r.get("content"), str) else json.dumps(r.get("content", ""), indent=2)
+            for r in results if "content" in r
+        )
+        output.write_text(out_content, encoding="utf-8")
+        console.print(f"Saved to {output}")
+    else:
+        for r in results:
+            content = r.get("content", "")
+            if isinstance(content, str):
+                _output_text(content)
+            else:
+                _output_json(content)
+
+
+# ------------------------------------------------------------------
+# crawl — matches firecrawl crawl
+# ------------------------------------------------------------------
+
+
+@app.command()
+def crawl(
+    url_or_job_id: Annotated[str, typer.Argument(help="URL to crawl or job ID to check")],
+    wait: Annotated[bool, typer.Option("--wait", help="Wait for completion")] = False,
+    poll_interval: Annotated[int, typer.Option("--poll-interval", help="Poll interval in seconds")] = 5,
+    timeout: Annotated[Optional[int], typer.Option("--timeout", help="Timeout in seconds")] = None,
+    progress: Annotated[bool, typer.Option("--progress", help="Show progress")] = False,
+    limit: Annotated[Optional[int], typer.Option("--limit", help="Max pages to crawl")] = None,
+    max_depth: Annotated[Optional[int], typer.Option("--max-depth", help="Max crawl depth")] = None,
+    exclude_paths: Annotated[Optional[str], typer.Option("--exclude-paths", help="Comma-separated exclude patterns")] = None,
+    include_paths: Annotated[Optional[str], typer.Option("--include-paths", help="Comma-separated include patterns")] = None,
+    allow_external: Annotated[bool, typer.Option("--allow-external-links", help="Follow external links")] = False,
+    allow_subdomains: Annotated[bool, typer.Option("--allow-subdomains", help="Follow subdomains")] = False,
+    format: Annotated[str, typer.Option("--format", "-f", help="Output format: markdown, html, json")] = "markdown",
+    no_render: Annotated[bool, typer.Option("--no-render", help="Skip JS rendering (faster)")] = False,
+    source: Annotated[Optional[str], typer.Option("--source", help="URL source: all, sitemaps, links")] = None,
+    output: Annotated[Optional[Path], typer.Option("--output", "-o", help="Output file")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = True,
+    ndjson: Annotated[bool, typer.Option("--ndjson", help="Stream one JSON record per line")] = False,
+    fields: Annotated[Optional[str], typer.Option("--fields", help="Comma-separated fields per record")] = None,
+    status_check: Annotated[bool, typer.Option("--status", help="Check status of existing job")] = False,
+    body: Annotated[Optional[str], typer.Option("--body", help="Raw JSON body")] = None,
+):
+    """Crawl a website. Returns JSON by default (like firecrawl).
+
+    Start a new crawl or check status of an existing job.
+
+    Example:
+        flarecrawl crawl https://example.com --wait --limit 10
+        flarecrawl crawl https://example.com --wait --progress --limit 50
+        flarecrawl crawl JOB_ID --status
+        flarecrawl crawl JOB_ID --ndjson --fields url,markdown
+    """
+    client = _get_client(json_output)
+
+    # If it looks like a job ID (UUID-like), check status
+    is_job_id = not url_or_job_id.startswith("http") or status_check
+
+    if is_job_id:
+        try:
+            if status_check:
+                result = client.crawl_status(url_or_job_id)
+            else:
+                result = client.crawl_get(url_or_job_id)
+            _output_json({"data": result, "meta": {}})
+        except FlareCrawlError as e:
+            _handle_api_error(e, json_output)
+        return
+
+    # Start new crawl
+    _validate_url(url_or_job_id, json_output)
+    raw_body = _parse_body(body, json_output)
+
+    if raw_body:
+        raw_body.setdefault("url", url_or_job_id)
+        try:
+            result = client.post_raw("crawl", raw_body)
+            job_id = result.get("result", "")
+        except FlareCrawlError as e:
+            _handle_api_error(e, json_output)
+            return
+    else:
+        kwargs = {}
+        if limit is not None:
+            kwargs["limit"] = limit
+        if max_depth is not None:
+            kwargs["depth"] = max_depth
+        if format:
+            kwargs["formats"] = [format]
+        if no_render:
+            kwargs["render"] = False
+        if source:
+            kwargs["source"] = source
+        if allow_external:
+            kwargs["include_external"] = True
+        if allow_subdomains:
+            kwargs["include_subdomains"] = True
+        if include_paths:
+            kwargs["include_patterns"] = [p.strip() for p in include_paths.split(",")]
+        if exclude_paths:
+            kwargs["exclude_patterns"] = [p.strip() for p in exclude_paths.split(",")]
+
+        try:
+            job_id = client.crawl_start(url_or_job_id, **kwargs)
+        except FlareCrawlError as e:
+            _handle_api_error(e, json_output)
+            return
+
+    if not wait:
+        result = {"job_id": job_id, "status": "running", "url": url_or_job_id}
+        if json_output:
+            _output_json({"data": result, "meta": {}})
+        else:
+            console.print(f"Crawl started: [cyan]{job_id}[/cyan]")
+            console.print(f"Check status: flarecrawl crawl {job_id} --status")
+        return
+
+    # Wait for completion
+    try:
+        if progress:
+            with Live(Spinner("dots", text="Starting crawl..."), console=console, refresh_per_second=4) as live:
+                def update_progress(status):
+                    finished = status.get("finished", 0)
+                    total = status.get("total", "?")
+                    state = status.get("status", "running")
+                    live.update(Spinner("dots", text=f"Crawling... {finished}/{total} pages [{state}]"))
+
+                final_status = client.crawl_wait(
+                    job_id, timeout=timeout or 600, poll_interval=poll_interval,
+                    callback=update_progress,
+                )
+        else:
+            final_status = client.crawl_wait(
+                job_id, timeout=timeout or 600, poll_interval=poll_interval,
+            )
+    except FlareCrawlError as e:
+        _handle_api_error(e, json_output)
+        return
+
+    # Fetch results
+    try:
+        if ndjson:
+            # Stream mode: output one record per line as they come
+            count = 0
+            for record in client.crawl_get_all(job_id):
+                if fields:
+                    record = _filter_fields(record, fields)
+                _output_ndjson(record)
+                count += 1
+            if client.browser_ms_used:
+                console.print(f"[dim]Browser time: {client.browser_ms_used}ms ({count} records)[/dim]")
+            return
+
+        records = list(client.crawl_get_all(job_id))
+    except FlareCrawlError as e:
+        _handle_api_error(e, json_output)
+        return
+
+    result = {
+        "job_id": job_id,
+        "status": final_status.get("status"),
+        "total": final_status.get("total", len(records)),
+        "browser_seconds": final_status.get("browserSecondsUsed"),
+        "records": records,
+    }
+
+    if fields:
+        result["records"] = _filter_fields(result["records"], fields)
+
+    if output:
+        output.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
+        console.print(f"Results saved to {output} ({len(records)} pages)")
+    elif json_output:
+        _output_json({"data": result, "meta": {"count": len(records)}})
+    else:
+        _output_json(result)
+
+
+# ------------------------------------------------------------------
+# map — matches firecrawl map
+# ------------------------------------------------------------------
+
+
+@app.command("map")
+def map_urls(
+    url: Annotated[str, typer.Argument(help="URL to map")],
+    limit: Annotated[Optional[int], typer.Option("--limit", help="Max URLs to discover")] = None,
+    include_subdomains: Annotated[bool, typer.Option("--include-subdomains", help="Include subdomains")] = False,
+    output: Annotated[Optional[Path], typer.Option("--output", "-o", help="Output file")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    body: Annotated[Optional[str], typer.Option("--body", help="Raw JSON body")] = None,
+):
+    """Discover all URLs on a website.
+
+    Uses the /links endpoint for quick single-page discovery.
+    For deep discovery, use 'flarecrawl crawl' with --format links.
+
+    Example:
+        flarecrawl map https://example.com
+        flarecrawl map https://example.com --json
+        flarecrawl map https://example.com --include-subdomains
+    """
+    client = _get_client(json_output)
+    _validate_url(url, json_output)
+    raw_body = _parse_body(body, json_output)
+
+    try:
+        if raw_body:
+            raw_body.setdefault("url", url)
+            result = client.post_raw("links", raw_body)
+            links = result.get("result", result)
+        else:
+            kwargs = {}
+            if include_subdomains:
+                kwargs["internal_only"] = False
+            else:
+                kwargs["internal_only"] = True
+            links = client.get_links(url, **kwargs)
+    except FlareCrawlError as e:
+        _handle_api_error(e, json_output)
+        return
+
+    if not isinstance(links, list):
+        links = [links]
+
+    # Apply limit
+    if limit and len(links) > limit:
+        links = links[:limit]
+
+    if output:
+        output.write_text("\n".join(links), encoding="utf-8")
+        console.print(f"Saved {len(links)} URLs to {output}")
+    elif json_output:
+        _output_json({"data": links, "meta": {"count": len(links)}})
+    else:
+        for link in links:
+            _output_text(link)
+
+
+# ------------------------------------------------------------------
+# download — matches firecrawl download
+# ------------------------------------------------------------------
+
+
+@app.command()
+def download(
+    url: Annotated[str, typer.Argument(help="URL to download")],
+    limit: Annotated[Optional[int], typer.Option("--limit", help="Max pages")] = None,
+    include_paths: Annotated[Optional[str], typer.Option("--include-paths", help="Include path patterns (comma-separated)")] = None,
+    exclude_paths: Annotated[Optional[str], typer.Option("--exclude-paths", help="Exclude path patterns (comma-separated)")] = None,
+    allow_subdomains: Annotated[bool, typer.Option("--allow-subdomains", help="Include subdomains")] = False,
+    format: Annotated[str, typer.Option("--format", "-f", help="Format: markdown, html")] = "markdown",
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+):
+    """Download a site into .flarecrawl/ as files.
+
+    Crawls the site and saves each page as a file in a nested directory structure.
+
+    Example:
+        flarecrawl download https://example.com --limit 20
+        flarecrawl download https://docs.example.com -f html --limit 50
+    """
+    client = _get_client(json_output)
+    _validate_url(url, json_output)
+
+    parsed = urlparse(url)
+    site_name = parsed.netloc.replace(":", "-")
+    output_dir = Path(".flarecrawl") / site_name
+    ext = ".md" if format == "markdown" else ".html"
+
+    # Confirmation
+    if not yes:
+        console.print(f"Will crawl [cyan]{url}[/cyan] and save to [cyan]{output_dir}/[/cyan]")
+        if limit:
+            console.print(f"Limit: {limit} pages")
+        if not typer.confirm("Proceed?", default=True):
+            raise typer.Exit(0)
+
+    # Start crawl
+    kwargs = {"formats": [format]}
+    if limit:
+        kwargs["limit"] = limit
+    if allow_subdomains:
+        kwargs["include_subdomains"] = True
+    if include_paths:
+        kwargs["include_patterns"] = [p.strip() for p in include_paths.split(",")]
+    if exclude_paths:
+        kwargs["exclude_patterns"] = [p.strip() for p in exclude_paths.split(",")]
+
+    try:
+        job_id = client.crawl_start(url, **kwargs)
+    except FlareCrawlError as e:
+        _handle_api_error(e, json_output)
+        return
+
+    # Wait with progress
+    console.print(f"Crawl started: [cyan]{job_id}[/cyan]")
+    with Live(Spinner("dots", text="Crawling..."), console=console, refresh_per_second=4) as live:
+        def update(status):
+            f = status.get("finished", 0)
+            t = status.get("total", "?")
+            live.update(Spinner("dots", text=f"Crawling... {f}/{t} pages"))
+
+        try:
+            client.crawl_wait(job_id, timeout=3600, callback=update)
+        except FlareCrawlError as e:
+            _handle_api_error(e, json_output)
+            return
+
+    # Save results
+    output_dir.mkdir(parents=True, exist_ok=True)
+    saved = 0
+    errors = 0
+
+    for record in client.crawl_get_all(job_id, status="completed"):
+        page_url = record.get("url", "")
+        content_key = format  # "markdown" or "html"
+        content = record.get(content_key, "")
+
+        if not content:
+            errors += 1
+            continue
+
+        filename = _sanitize_filename(page_url) + ext
+        filepath = output_dir / filename
+        filepath.write_text(content, encoding="utf-8")
+        saved += 1
+
+    summary = {
+        "directory": str(output_dir),
+        "saved": saved,
+        "errors": errors,
+        "format": format,
+    }
+
+    if json_output:
+        _output_json({"data": summary, "meta": {}})
+    else:
+        console.print(f"\n[green]Downloaded {saved} pages[/green] to {output_dir}/")
+        if errors:
+            console.print(f"[yellow]{errors} pages had no content[/yellow]")
+
+
+# ------------------------------------------------------------------
+# extract — matches firecrawl agent
+# ------------------------------------------------------------------
+
+
+@app.command()
+def extract(
+    prompt: Annotated[str, typer.Argument(help="Natural language prompt for extraction")],
+    urls: Annotated[Optional[str], typer.Option("--urls", help="Comma-separated URLs")] = None,
+    schema: Annotated[Optional[str], typer.Option("--schema", help="JSON schema (inline string)")] = None,
+    schema_file: Annotated[Optional[Path], typer.Option("--schema-file", help="Path to JSON schema file")] = None,
+    output: Annotated[Optional[Path], typer.Option("--output", "-o", help="Output file")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    body: Annotated[Optional[str], typer.Option("--body", help="Raw JSON body")] = None,
+):
+    """AI-powered structured data extraction from web pages.
+
+    Uses Cloudflare Workers AI to extract structured data based on a prompt.
+
+    Example:
+        flarecrawl extract "Extract all product names and prices" --urls https://shop.example.com --json
+        flarecrawl extract "Get article title and date" --urls https://blog.example.com --schema-file schema.json
+    """
+    client = _get_client(json_output)
+    raw_body = _parse_body(body, json_output)
+
+    # Parse URLs
+    url_list = []
+    if urls:
+        url_list = [u.strip() for u in urls.split(",")]
+    if not url_list and not raw_body:
+        _error(
+            "Provide at least one URL with --urls",
+            "VALIDATION_ERROR", EXIT_VALIDATION, as_json=json_output,
+        )
+
+    # Parse schema
+    response_format = None
+    if schema_file:
+        try:
+            response_format = json.loads(schema_file.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            _error(f"Invalid schema file: {e}", "VALIDATION_ERROR", EXIT_VALIDATION, as_json=json_output)
+    elif schema:
+        try:
+            response_format = json.loads(schema)
+        except json.JSONDecodeError as e:
+            _error(f"Invalid --schema JSON: {e}", "VALIDATION_ERROR", EXIT_VALIDATION, as_json=json_output)
+
+    results = []
+    target_urls = url_list if not raw_body else [raw_body.get("url", "")]
+
+    for url in target_urls:
+        _validate_url(url, json_output)
+        try:
+            if raw_body:
+                raw_body.setdefault("url", url)
+                result = client.post_raw("json", raw_body)
+                extracted = result.get("result", result)
+            else:
+                extracted = client.extract_json(url, prompt, response_format)
+            results.append({"url": url, "data": extracted})
+        except FlareCrawlError as e:
+            if len(target_urls) == 1:
+                _handle_api_error(e, json_output)
+                return
+            results.append({"url": url, "error": str(e)})
+
+    if output:
+        output.write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
+        console.print(f"Saved to {output}")
+    elif json_output:
+        if len(results) == 1:
+            _output_json({"data": results[0], "meta": {}})
+        else:
+            _output_json({"data": results, "meta": {"count": len(results)}})
+    else:
+        _output_json(results)
+
+
+# ------------------------------------------------------------------
+# screenshot — convenience command
+# ------------------------------------------------------------------
+
+
+@app.command()
+def screenshot(
+    url: Annotated[str, typer.Argument(help="URL to screenshot")],
+    output: Annotated[Path, typer.Option("--output", "-o", help="Output file")] = Path("screenshot.png"),
+    full_page: Annotated[bool, typer.Option("--full-page", help="Capture full page")] = False,
+    format: Annotated[str, typer.Option("--format", help="Image format: png, jpeg")] = "png",
+    width: Annotated[Optional[int], typer.Option("--width", help="Viewport width")] = None,
+    height: Annotated[Optional[int], typer.Option("--height", help="Viewport height")] = None,
+    selector: Annotated[Optional[str], typer.Option("--selector", help="CSS selector to capture")] = None,
+    wait_for: Annotated[Optional[str], typer.Option("--wait-for", help="CSS selector to wait for")] = None,
+    timeout: Annotated[Optional[int], typer.Option("--timeout", help="Timeout in ms")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON (base64)")] = False,
+    body: Annotated[Optional[str], typer.Option("--body", help="Raw JSON body")] = None,
+):
+    """Capture a screenshot of a web page.
+
+    Example:
+        flarecrawl screenshot https://example.com
+        flarecrawl screenshot https://example.com -o hero.png --full-page
+        flarecrawl screenshot https://example.com --selector "main" -o main.png
+    """
+    client = _get_client(json_output)
+    _validate_url(url, json_output)
+    raw_body = _parse_body(body, json_output)
+
+    try:
+        if raw_body:
+            raw_body.setdefault("url", url)
+            data, _ = client._post_binary("screenshot", raw_body)
+        else:
+            kwargs = {}
+            if full_page:
+                kwargs["full_page"] = True
+            if format != "png":
+                kwargs["image_type"] = format
+            if width:
+                kwargs["width"] = width
+            if height:
+                kwargs["height"] = height
+            if selector:
+                kwargs["selector"] = selector
+            if wait_for:
+                kwargs["wait_for"] = wait_for
+            if timeout:
+                kwargs["timeout"] = timeout
+            data = client.take_screenshot(url, **kwargs)
+    except FlareCrawlError as e:
+        _handle_api_error(e, json_output)
+        return
+
+    if json_output:
+        _output_json({
+            "data": {
+                "screenshot": base64.b64encode(data).decode(),
+                "encoding": "base64",
+                "format": format,
+                "size": len(data),
+            },
+            "meta": {"url": url},
+        })
+    else:
+        output.write_bytes(data)
+        console.print(f"Screenshot saved: [cyan]{output}[/cyan] ({len(data):,} bytes)")
+
+
+# ------------------------------------------------------------------
+# pdf — bonus command (CF has this, firecrawl doesn't)
+# ------------------------------------------------------------------
+
+
+@app.command()
+def pdf(
+    url: Annotated[str, typer.Argument(help="URL to render as PDF")],
+    output: Annotated[Path, typer.Option("--output", "-o", help="Output file")] = Path("page.pdf"),
+    landscape: Annotated[bool, typer.Option("--landscape", help="Landscape orientation")] = False,
+    format: Annotated[str, typer.Option("--format", help="Paper format: letter, a4")] = "letter",
+    print_background: Annotated[bool, typer.Option("--print-background", help="Include background")] = True,
+    timeout: Annotated[Optional[int], typer.Option("--timeout", help="Timeout in ms")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON (base64)")] = False,
+    body: Annotated[Optional[str], typer.Option("--body", help="Raw JSON body")] = None,
+):
+    """Render a web page as PDF.
+
+    Example:
+        flarecrawl pdf https://example.com
+        flarecrawl pdf https://example.com -o report.pdf --landscape
+    """
+    client = _get_client(json_output)
+    _validate_url(url, json_output)
+    raw_body = _parse_body(body, json_output)
+
+    try:
+        if raw_body:
+            raw_body.setdefault("url", url)
+            data, _ = client._post_binary("pdf", raw_body)
+        else:
+            kwargs = {}
+            if landscape:
+                kwargs["landscape"] = True
+            if format != "letter":
+                kwargs["paper_format"] = format
+            if print_background:
+                kwargs["print_background"] = True
+            if timeout:
+                kwargs["timeout"] = timeout
+            data = client.render_pdf(url, **kwargs)
+    except FlareCrawlError as e:
+        _handle_api_error(e, json_output)
+        return
+
+    if json_output:
+        _output_json({
+            "data": {
+                "pdf": base64.b64encode(data).decode(),
+                "encoding": "base64",
+                "size": len(data),
+            },
+            "meta": {"url": url},
+        })
+    else:
+        output.write_bytes(data)
+        console.print(f"PDF saved: [cyan]{output}[/cyan] ({len(data):,} bytes)")
+
+
+# ------------------------------------------------------------------
+# usage — browser time tracking
+# ------------------------------------------------------------------
+
+
+@app.command()
+def usage(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+):
+    """Show browser rendering time usage (tracked locally).
+
+    Tracks the X-Browser-Ms-Used header from each API response.
+    Free tier: 600,000ms (10 min) per day.
+
+    Example:
+        flarecrawl usage
+        flarecrawl usage --json
+    """
+    from datetime import date
+
+    usage_data = get_usage()
+    today = date.today().isoformat()
+    today_ms = usage_data.get(today, 0)
+    total_ms = sum(usage_data.values())
+
+    daily_limit_ms = 600_000  # 10 minutes free tier
+    today_pct = (today_ms / daily_limit_ms * 100) if daily_limit_ms else 0
+    cost_estimate = total_ms / 3_600_000 * 0.09  # $0.09/hr
+
+    result = {
+        "today_ms": today_ms,
+        "today_seconds": round(today_ms / 1000, 1),
+        "today_percent_of_free": round(today_pct, 1),
+        "total_ms": total_ms,
+        "total_seconds": round(total_ms / 1000, 1),
+        "estimated_cost": round(cost_estimate, 4),
+        "daily_history": usage_data,
+    }
+
+    if json_output:
+        _output_json({"data": result, "meta": {}})
+        return
+
+    console.print(f"[bold]Today[/bold] ({today})")
+    console.print(f"  Browser time: [cyan]{today_ms / 1000:.1f}s[/cyan] / 600s free ({today_pct:.1f}%)")
+
+    if today_pct < 50:
+        console.print(f"  Status: [green]well within free tier[/green]")
+    elif today_pct < 90:
+        console.print(f"  Status: [yellow]approaching daily limit[/yellow]")
+    else:
+        console.print(f"  Status: [red]at/over free tier limit[/red]")
+
+    if len(usage_data) > 1:
+        console.print()
+        console.print("[bold]History[/bold]")
+        table = Table()
+        table.add_column("Date")
+        table.add_column("Seconds", justify="right")
+        table.add_column("% Free", justify="right")
+        for day in sorted(usage_data.keys(), reverse=True)[:7]:
+            ms = usage_data[day]
+            pct = ms / daily_limit_ms * 100
+            table.add_row(day, f"{ms / 1000:.1f}", f"{pct:.1f}%")
+        console.print(table)
+
+    console.print()
+    console.print(f"[dim]Total tracked: {total_ms / 1000:.1f}s | Est. cost: ${cost_estimate:.4f}[/dim]")
+    console.print(f"[dim]Pricing: Free 10 min/day, then $0.09/hr[/dim]")
+
+
+if __name__ == "__main__":
+    app()
