@@ -1,4 +1,4 @@
-# FlareCrawl
+# Flarecrawl
 
 [![GitHub](https://img.shields.io/badge/github-0xDarkMatter%2Fflarecrawl-blue?logo=github)](https://github.com/0xDarkMatter/flarecrawl)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -9,9 +9,9 @@
 
 CLI that wraps Cloudflare's [Browser Rendering REST API](https://developers.cloudflare.com/browser-rendering/rest-api/) with the same command structure as `firecrawl`. Supports scraping, crawling, URL discovery, screenshots, PDFs, and AI-powered data extraction — all running on Cloudflare's headless Chromium infrastructure. Significantly cheaper than Firecrawl at scale (free 10 min/day, then $0.09/hr vs per-page credit pricing).
 
-## Why FlareCrawl?
+## Why Flarecrawl?
 
-| | Firecrawl | FlareCrawl |
+| | Firecrawl | Flarecrawl |
 |---|---|---|
 | **Pricing** | ~$0.003-0.01/page (credits) | Free 10 min/day, then $0.09/hr |
 | **30-page crawl** | ~$0.09-0.30 | **$0.0013** |
@@ -247,7 +247,7 @@ flarecrawl auth logout                   # Clear credentials
 
 ## Firecrawl Compatibility
 
-FlareCrawl is designed as a drop-in replacement for the `firecrawl` CLI:
+Flarecrawl is designed as a drop-in replacement for the `firecrawl` CLI:
 
 | firecrawl command | flarecrawl equivalent | Notes |
 |---|---|---|
