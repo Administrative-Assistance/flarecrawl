@@ -1,6 +1,6 @@
 # Flarecrawl - AI Agent Context
 
-> Cloudflare Browser Rendering CLI — drop-in replacement for `firecrawl`, much cheaper.
+> Cloudflare Browser Rendering CLI — Firecrawl-compatible, cost-efficient at scale.
 > Renders JavaScript, extracts content, takes screenshots, generates PDFs, crawls entire sites.
 
 ## Quick Reference

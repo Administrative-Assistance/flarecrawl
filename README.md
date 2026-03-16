@@ -5,22 +5,24 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Cloudflare](https://img.shields.io/badge/cloudflare-browser--rendering-orange?logo=cloudflare)](https://developers.cloudflare.com/browser-rendering/)
 
-> Cloudflare Browser Rendering CLI — drop-in replacement for `firecrawl`, much cheaper.
+> Cloudflare Browser Rendering CLI — Firecrawl-compatible, cost-efficient at scale.
 
-CLI that wraps Cloudflare's [Browser Rendering REST API](https://developers.cloudflare.com/browser-rendering/rest-api/) with the same command structure as `firecrawl`. Supports scraping, crawling, URL discovery, screenshots, PDFs, and AI-powered data extraction — all running on Cloudflare's headless Chromium infrastructure. Significantly cheaper than Firecrawl at scale (free 10 min/day, then $0.09/hr vs per-page credit pricing).
+CLI that wraps Cloudflare's [Browser Rendering REST API](https://developers.cloudflare.com/browser-rendering/rest-api/) with the same command structure as Firecrawl. Supports scraping, crawling, URL discovery, screenshots, PDFs, and AI-powered data extraction — all running on Cloudflare's headless Chromium infrastructure. Cost-efficient alternative for high-volume use cases (free 10 min/day, then $0.09/hr).
 
 ## Why Flarecrawl?
 
 | | Firecrawl | Flarecrawl |
 |---|---|---|
-| **Pricing** | ~$0.003-0.01/page (credits) | Free 10 min/day, then $0.09/hr |
-| **30-page crawl** | ~$0.09-0.30 | **$0.0013** |
-| **1,000-page crawl** | ~$3-10 | **~$0.025** |
+| **Pricing model** | Per-page credits | Time-based (free 10 min/day, then $0.09/hr) |
 | **JS rendering** | Yes | Yes (headless Chromium on edge) |
 | **PDF generation** | No | Yes |
-| **AI extraction** | Spark models (paid) | Workers AI (included) |
-| **Self-hosted option** | Yes (complex) | Cloudflare infrastructure |
+| **AI extraction** | Spark models | Workers AI (included) |
+| **Favicon extraction** | Via branding format | Dedicated command |
+| **Self-hosted option** | Yes | Cloudflare infrastructure |
 | **Web search** | Yes | No |
+| **Branding extraction** | Yes | Not yet |
+
+Different pricing models suit different use cases. Flarecrawl's time-based pricing is particularly cost-efficient for high-volume crawls.
 
 ## Install
 
@@ -269,7 +271,7 @@ flarecrawl auth logout                   # Clear credentials
 
 ## Firecrawl Compatibility
 
-Flarecrawl is designed as a drop-in replacement for the `firecrawl` CLI:
+Flarecrawl follows the same command structure as the `firecrawl` CLI:
 
 | firecrawl command | flarecrawl equivalent | Notes |
 |---|---|---|

@@ -12,7 +12,7 @@ allowed-tools: "Read Bash Grep"
 
 # Flarecrawl Operations
 
-Cloudflare Browser Rendering CLI — drop-in replacement for `firecrawl`, much cheaper. Renders JavaScript, extracts markdown/HTML, crawls sites, takes screenshots, generates PDFs, and does AI-powered data extraction.
+Cloudflare Browser Rendering CLI — Firecrawl-compatible, cost-efficient at scale. Renders JavaScript, extracts markdown/HTML, crawls sites, takes screenshots, generates PDFs, and does AI-powered data extraction.
 
 ## Auth Check
 
