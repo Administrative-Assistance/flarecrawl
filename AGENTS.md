@@ -24,6 +24,8 @@
 | Screenshot | `flarecrawl screenshot URL -o file.png` |
 | Full page screenshot | `flarecrawl screenshot URL -o file.png --full-page` |
 | PDF | `flarecrawl pdf URL -o file.pdf` |
+| Favicon (best) | `flarecrawl favicon URL` |
+| Favicon (all) | `flarecrawl favicon URL --all --json` |
 | Check usage | `flarecrawl usage --json` |
 | Auth status | `flarecrawl auth status --json` |
 
@@ -192,6 +194,26 @@ flarecrawl pdf URL --landscape --format a4  # Landscape A4
 flarecrawl pdf URL --json                 # Base64 JSON output
 ```
 
+### favicon
+
+Extracts favicon URL from a web page by parsing `<link rel="icon">` and `<link rel="apple-touch-icon">` tags.
+
+```bash
+# Get best (largest) favicon URL
+flarecrawl favicon https://example.com
+# Output: https://example.com/apple-touch-icon-180x180.png
+
+# All icons with details
+flarecrawl favicon https://example.com --all --json
+# Returns: {"data": [{"url": "...", "rel": "apple-touch-icon", "sizes": "180x180"}, ...], "meta": {"count": 3}}
+
+# Single best as JSON
+flarecrawl favicon https://example.com --json
+# Returns: {"data": {"url": "...", "rel": "icon", "sizes": "32x32"}, "meta": {"url": "...", "count": 1}}
+```
+
+Falls back to `/favicon.ico` if no `<link>` tags found. Uses `rejectResourceTypes` to skip images/CSS for speed.
+
 ### usage
 
 Tracks browser time locally from `X-Browser-Ms-Used` response headers.
@@ -232,6 +254,11 @@ flarecrawl usage --json
 ### Screenshot/PDF
 ```json
 {"data": {"screenshot": "base64...", "encoding": "base64", "format": "png", "size": 22268}, "meta": {"url": "..."}}
+```
+
+### Favicon
+```json
+{"data": {"url": "https://example.com/apple-touch-icon.png", "rel": "apple-touch-icon", "sizes": "180x180", "type": null}, "meta": {"url": "...", "count": 3}}
 ```
 
 ### Error

@@ -349,7 +349,6 @@ def scrape(
         str,
         typer.Option("--format", "-f", help="Output format: markdown, html, links, screenshot, json"),
     ] = "markdown",
-    only_main_content: Annotated[bool, typer.Option("--only-main-content", help="Main content only")] = False,
     wait_for: Annotated[Optional[int], typer.Option("--wait-for", help="Wait time in ms")] = None,
     screenshot: Annotated[bool, typer.Option("--screenshot", help="Take screenshot")] = False,
     full_page_screenshot: Annotated[bool, typer.Option("--full-page-screenshot", help="Full page screenshot")] = False,
@@ -1117,6 +1116,114 @@ def pdf(
     else:
         output.write_bytes(data)
         console.print(f"PDF saved: [cyan]{output}[/cyan] ({len(data):,} bytes)")
+
+
+# ------------------------------------------------------------------
+# favicon — extract favicon URL
+# ------------------------------------------------------------------
+
+
+def _extract_favicons(html: str, base_url: str) -> list[dict]:
+    """Parse <link rel="icon"> and related tags from HTML."""
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin
+
+    favicons: list[dict] = []
+
+    class FaviconParser(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            if tag != "link":
+                return
+            attr_dict = dict(attrs)
+            rel = (attr_dict.get("rel") or "").lower()
+            href = attr_dict.get("href")
+            if not href:
+                return
+            icon_rels = {"icon", "shortcut icon", "apple-touch-icon", "apple-touch-icon-precomposed"}
+            if rel not in icon_rels:
+                return
+            sizes = attr_dict.get("sizes", "")
+            # Parse size to integer for sorting (e.g., "192x192" → 192)
+            size = 0
+            if sizes and "x" in sizes.lower():
+                try:
+                    size = int(sizes.lower().split("x")[0])
+                except ValueError:
+                    pass
+            favicons.append({
+                "url": urljoin(base_url, href),
+                "rel": rel,
+                "sizes": sizes or None,
+                "size": size,
+                "type": attr_dict.get("type"),
+            })
+
+    FaviconParser().feed(html)
+
+    # Sort: largest first, apple-touch-icon preferred at equal size
+    favicons.sort(key=lambda f: (f["size"], "apple" in f["rel"]), reverse=True)
+    return favicons
+
+
+@app.command()
+def favicon(
+    url: Annotated[str, typer.Argument(help="URL to extract favicon from")],
+    all_icons: Annotated[bool, typer.Option("--all", help="Show all found icons, not just the best")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    timeout: Annotated[Optional[int], typer.Option("--timeout", help="Timeout in ms")] = None,
+):
+    """Extract favicon URL from a web page.
+
+    Renders the page, parses <link rel="icon"> and apple-touch-icon tags,
+    and returns the largest/best favicon found.
+
+    Example:
+        flarecrawl favicon https://example.com
+        flarecrawl favicon https://example.com --all --json
+    """
+    client = _get_client(json_output)
+    _validate_url(url, json_output)
+
+    try:
+        kwargs = {}
+        if timeout:
+            kwargs["timeout"] = timeout
+        # Reject images/media/fonts to speed up — we only need HTML
+        kwargs["reject_resources"] = ["image", "media", "font", "stylesheet"]
+        html = client.get_content(url, **kwargs)
+    except FlareCrawlError as e:
+        _handle_api_error(e, json_output)
+        return
+
+    favicons = _extract_favicons(html, url)
+
+    if not favicons:
+        # Fallback: try /favicon.ico
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        fallback = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
+        favicons = [{"url": fallback, "rel": "icon", "sizes": None, "size": 0, "type": None}]
+        if not json_output:
+            console.print(f"[yellow]No <link> icons found, falling back to:[/yellow] {fallback}")
+
+    if all_icons:
+        # Strip internal sort key
+        output_data = [{k: v for k, v in f.items() if k != "size"} for f in favicons]
+    else:
+        best = favicons[0]
+        output_data = {k: v for k, v in best.items() if k != "size"}
+
+    if json_output:
+        meta = {"url": url, "count": len(favicons)}
+        _output_json({"data": output_data, "meta": meta})
+    else:
+        if all_icons:
+            for f in favicons:
+                size_str = f" ({f['sizes']})" if f.get("sizes") else ""
+                console.print(f"[cyan]{f['url']}[/cyan]{size_str} [{f['rel']}]")
+        else:
+            best = favicons[0]
+            _output_text(best["url"])
 
 
 # ------------------------------------------------------------------

@@ -85,6 +85,17 @@ class TestHelp:
         assert "--landscape" in result.output
         assert "--timeout" in result.output
 
+    def test_favicon_help(self):
+        result = runner.invoke(app, ["favicon", "--help"])
+        assert result.exit_code == 0
+        assert "--all" in result.output
+        assert "--json" in result.output
+
+    def test_scrape_no_only_main_content(self):
+        """--only-main-content was removed (CF /markdown has no such option)."""
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--only-main-content" not in result.output
+
 
 class TestAuth:
     """Test auth commands."""
@@ -132,6 +143,10 @@ class TestAuthRequired:
 
     def test_pdf_requires_auth(self, no_credentials):
         result = runner.invoke(app, ["pdf", "https://example.com", "--json"])
+        assert result.exit_code == 2
+
+    def test_favicon_requires_auth(self, no_credentials):
+        result = runner.invoke(app, ["favicon", "https://example.com", "--json"])
         assert result.exit_code == 2
 
     def test_extract_requires_auth(self, no_credentials):
@@ -241,3 +256,56 @@ class TestBatch:
         """Extract with no --urls and no --batch should error."""
         result = runner.invoke(app, ["extract", "Get title", "--json"])
         assert result.exit_code == 4
+
+
+class TestFavicon:
+    """Test favicon extraction helper."""
+
+    def test_extract_favicons_basic(self):
+        from flarecrawl.cli import _extract_favicons
+        html = '<html><head><link rel="icon" href="/favicon.ico"></head></html>'
+        result = _extract_favicons(html, "https://example.com")
+        assert len(result) == 1
+        assert result[0]["url"] == "https://example.com/favicon.ico"
+        assert result[0]["rel"] == "icon"
+
+    def test_extract_favicons_multiple(self):
+        from flarecrawl.cli import _extract_favicons
+        html = """<html><head>
+        <link rel="icon" href="/favicon.ico">
+        <link rel="icon" href="/icon-32.png" sizes="32x32">
+        <link rel="apple-touch-icon" href="/apple-180.png" sizes="180x180">
+        </head></html>"""
+        result = _extract_favicons(html, "https://example.com")
+        assert len(result) == 3
+        # Largest first
+        assert result[0]["url"] == "https://example.com/apple-180.png"
+        assert result[0]["sizes"] == "180x180"
+
+    def test_extract_favicons_relative_urls(self):
+        from flarecrawl.cli import _extract_favicons
+        html = '<link rel="icon" href="assets/icon.png">'
+        result = _extract_favicons(html, "https://example.com/page/")
+        assert result[0]["url"] == "https://example.com/page/assets/icon.png"
+
+    def test_extract_favicons_absolute_urls(self):
+        from flarecrawl.cli import _extract_favicons
+        html = '<link rel="icon" href="https://cdn.example.com/icon.png">'
+        result = _extract_favicons(html, "https://example.com")
+        assert result[0]["url"] == "https://cdn.example.com/icon.png"
+
+    def test_extract_favicons_ignores_non_icon_links(self):
+        from flarecrawl.cli import _extract_favicons
+        html = """<head>
+        <link rel="stylesheet" href="/style.css">
+        <link rel="canonical" href="https://example.com">
+        <link rel="icon" href="/favicon.ico">
+        </head>"""
+        result = _extract_favicons(html, "https://example.com")
+        assert len(result) == 1
+        assert result[0]["rel"] == "icon"
+
+    def test_extract_favicons_empty_html(self):
+        from flarecrawl.cli import _extract_favicons
+        result = _extract_favicons("<html><head></head></html>", "https://example.com")
+        assert result == []

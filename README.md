@@ -1,4 +1,4 @@
-# Flarecrawl
+# 🔥 Flarecrawl CLI
 
 [![GitHub](https://img.shields.io/badge/github-0xDarkMatter%2Fflarecrawl-blue?logo=github)](https://github.com/0xDarkMatter/flarecrawl)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -229,6 +229,22 @@ flarecrawl pdf https://example.com -o report.pdf --landscape --format a4
 flarecrawl pdf https://example.com --json
 ```
 
+### favicon — Extract favicon URL
+
+```bash
+# Get the best (largest) favicon
+flarecrawl favicon https://example.com
+
+# Show all found icons
+flarecrawl favicon https://example.com --all
+
+# JSON output
+flarecrawl favicon https://example.com --json
+flarecrawl favicon https://example.com --all --json
+```
+
+Renders the page, parses `<link rel="icon">`, `<link rel="apple-touch-icon">`, and related tags. Returns the largest icon found. Falls back to `/favicon.ico` if no `<link>` tags found.
+
 ### usage — Track browser time
 
 ```bash
@@ -271,8 +287,10 @@ Flarecrawl is designed as a drop-in replacement for the `firecrawl` CLI:
 
 - **No `search` command** — Cloudflare doesn't have a web search API
 - **`extract` instead of `agent`** — same concept, different name to avoid confusion
+- **`favicon` command** — bonus: extract favicon/apple-touch-icon URLs from pages
 - **PDF command** — bonus: Cloudflare supports PDF rendering, Firecrawl doesn't
 - **Output directory** — `.flarecrawl/` instead of `.firecrawl/`
+- **No `--only-main-content`** — CF's `/markdown` endpoint returns full page content; use `extract` for targeted extraction
 
 ## Output Format
 

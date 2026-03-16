@@ -58,6 +58,13 @@ flarecrawl download https://docs.example.com --limit 50
 # Creates: .flarecrawl/<domain>/<page>.md
 ```
 
+### 6. Extract favicon
+
+```bash
+flarecrawl favicon https://example.com
+flarecrawl favicon https://example.com --all --json
+```
+
 ## Batch & Parallel
 
 `scrape` and `extract` support `--batch`/`-b` and `--workers`/`-w`:

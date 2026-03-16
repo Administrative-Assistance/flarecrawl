@@ -33,8 +33,8 @@ packages = ["src/flarecrawl"]
 # FABRIC METADATA (Required for registry)
 # ============================================================
 [tool.fabric]
-description = "Cloudflare Browser Rendering - scrape, crawl, map, download, extract, screenshot, pdf"
-resources = ["scrape", "crawl", "map", "download", "extract", "screenshot", "pdf"]
+description = "Cloudflare Browser Rendering - scrape, crawl, map, download, extract, screenshot, pdf, favicon"
+resources = ["scrape", "crawl", "map", "download", "extract", "screenshot", "pdf", "favicon"]
 auth = "api_key"
 status = "experimental"
 origin = "fabric"
