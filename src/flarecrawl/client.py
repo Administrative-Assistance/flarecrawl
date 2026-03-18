@@ -357,73 +357,12 @@ class Client:
     def get_markdown(self, url: str, **kwargs) -> str:
         """Extract markdown from page. Returns markdown string.
 
-        Default strategy: race two requests in parallel using raw httpx
-        (not the shared session, since httpx.Client isn't thread-safe):
-        1. Fast path: CF default waitUntil (load) — returns quickly
-        2. JS path: networkidle0 with 5s timeout — captures JS content
-
-        Returns fast path result. If JS path finishes within 1s after,
-        and has more content, returns that instead.
-        Override via wait_until kwarg to skip the race.
+        Uses CF default waitUntil (load) for speed. For JS-heavy pages,
+        use --wait-until networkidle0 or networkidle2.
         """
-        if "wait_until" in kwargs:
-            # User specified — no race, just do what they asked
-            body = self._build_body(url=url, **kwargs)
-            result = self._post_json("markdown", body)
-            return result.get("result", result)
-
-        # Race: fast (load) vs JS (networkidle0 with 5s timeout)
-        import concurrent.futures
-
-        api_url = f"{self._base}/markdown"
-        headers = dict(self._session.headers)
-
-        def _request(body: dict) -> dict | None:
-            """Make a standalone request (thread-safe, no shared session)."""
-            try:
-                resp = httpx.post(api_url, headers=headers, json=body, timeout=self.TIMEOUT)
-                if resp.status_code >= 400:
-                    return None
-                self._track_browser_time(resp)
-                return resp.json()
-            except (httpx.TimeoutException, Exception):
-                return None
-
-        fast_body = self._build_body(url=url, **kwargs)
-        js_body = self._build_body(url=url, **{**kwargs, "wait_until": "networkidle0", "timeout": 5000})
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-            fast_future = pool.submit(_request, fast_body)
-            js_future = pool.submit(_request, js_body)
-
-            # Wait for fast path
-            fast_result = fast_future.result()
-            fast_md = ""
-            if fast_result:
-                fast_md = fast_result.get("result", fast_result)
-                if isinstance(fast_md, dict):
-                    fast_md = str(fast_md)
-
-            # Give JS path a brief grace window (1s)
-            try:
-                js_result = js_future.result(timeout=1.0)
-                if js_result is not None:
-                    js_md = js_result.get("result", js_result)
-                    if isinstance(js_md, dict):
-                        js_md = str(js_md)
-                    # Prefer JS result if substantially more content
-                    if js_md and len(js_md) > len(fast_md) * 1.2:
-                        return js_md
-            except (concurrent.futures.TimeoutError, Exception):
-                pass
-
-            if fast_md:
-                return fast_md
-
-            # Both failed — fall back to session-based request
-            body = self._build_body(url=url, **kwargs)
-            result = self._post_json("markdown", body)
-            return result.get("result", result)
+        body = self._build_body(url=url, **kwargs)
+        result = self._post_json("markdown", body)
+        return result.get("result", result)
 
     def take_screenshot(self, url: str, **kwargs) -> bytes:
         """Capture screenshot. Returns binary PNG/JPEG."""
