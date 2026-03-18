@@ -20,3 +20,4 @@ iteration	commit	fc_total	fl_total	delta	status	description
 18	8ee91bf	-	-	-	keep	Expand benchmark to 8 URLs
 19	r3-check	4.30	4.70	-0.10	keep	R3 checkpoint: speed still 4, JS dropped to 4 (trade-off)
 20	r3-final	4.30	4.90	+0.20	keep	R3 FINAL: speed 5! rejectResources+pooling+8URLs. FL wins 5/6 dimensions
+21	3bd0d46	4.15	4.85	-0.05	keep	--js for JS URLs in benchmark. JS=5! Reliability=4 (transient network)
