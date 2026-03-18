@@ -393,3 +393,14 @@ This bypasses all flag processing and sends the body directly. Useful for advanc
 | Concurrency | Free: 3, Paid: 10 | +$2/extra browser |
 
 A typical page scrape uses 100-200ms of browser time. A 30-page crawl uses ~50s (~$0.001).
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FLARECRAWL_ACCOUNT_ID` | — | Cloudflare account ID (overrides config file) |
+| `FLARECRAWL_API_TOKEN` | — | Cloudflare API token (overrides config file) |
+| `FLARECRAWL_CACHE_TTL` | 3600 | Response cache TTL in seconds (0 to disable) |
+| `FLARECRAWL_MAX_RETRIES` | 3 | Max retry attempts on 429/502/503 |
+| `FLARECRAWL_MAX_WORKERS` | 10 | Max parallel workers for batch mode |
+| `FLARECRAWL_TIMEOUT` | 120 | Request timeout in seconds |

@@ -471,12 +471,14 @@ flarecrawl/
 ├── src/flarecrawl/
 │   ├── __init__.py             # Version
 │   ├── batch.py                # Batch processing (parse + parallel workers)
+│   ├── cache.py                # File-based response cache
 │   ├── cli.py                  # Typer CLI (all commands)
-│   ├── client.py               # CF Browser Rendering API client
-│   └── config.py               # Credentials + usage tracking
+│   ├── client.py               # CF Browser Rendering API client (httpx pooling, HTTP/2)
+│   └── config.py               # Credentials, usage tracking, env-var config
 └── tests/
     ├── conftest.py             # Test fixtures
     ├── test_batch.py           # Batch module tests
+    ├── test_cache.py           # Cache module tests
     ├── test_cli.py             # CLI tests
     └── test_client.py          # Client tests
 ```
