@@ -806,6 +806,7 @@ def map_urls(
     output: Annotated[Path | None, typer.Option("--output", "-o", help="Output file")] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
+    no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
 ):
     """Discover all URLs on a website.
 
@@ -817,7 +818,8 @@ def map_urls(
         flarecrawl map https://example.com --json
         flarecrawl map https://example.com --include-subdomains
     """
-    client = _get_client(json_output)
+    cache_ttl = 0 if no_cache else 3600
+    client = _get_client(json_output, cache_ttl=cache_ttl)
     _validate_url(url, json_output)
     raw_body = _parse_body(body, json_output)
 
@@ -975,6 +977,7 @@ def extract(
     batch: Annotated[Path | None, typer.Option("--batch", "-b", help="Batch input file with URLs")] = None,
     workers: Annotated[int, typer.Option("--workers", "-w", help="Parallel workers for batch (max 10)")] = 3,
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
+    no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
 ):
     """AI-powered structured data extraction from web pages.
 
@@ -987,7 +990,8 @@ def extract(
         flarecrawl extract "Get page title" --batch urls.txt --workers 5
     """
     is_batch_mode = batch is not None
-    client = _get_client(json_output or is_batch_mode)
+    cache_ttl = 0 if no_cache else 3600
+    client = _get_client(json_output or is_batch_mode, cache_ttl=cache_ttl)
     raw_body = _parse_body(body, json_output or is_batch_mode)
 
     # Parse URLs from --urls flag
@@ -1271,6 +1275,7 @@ def favicon(
     all_icons: Annotated[bool, typer.Option("--all", help="Show all found icons, not just the best")] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     timeout: Annotated[int | None, typer.Option("--timeout", help="Timeout in ms")] = None,
+    no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
 ):
     """Extract favicon URL from a web page.
 
@@ -1281,7 +1286,8 @@ def favicon(
         flarecrawl favicon https://example.com
         flarecrawl favicon https://example.com --all --json
     """
-    client = _get_client(json_output)
+    cache_ttl = 0 if no_cache else 3600
+    client = _get_client(json_output, cache_ttl=cache_ttl)
     _validate_url(url, json_output)
 
     try:
