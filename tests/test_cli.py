@@ -27,7 +27,7 @@ class TestHelp:
     def test_version(self):
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "flarecrawl 0.3.0" in result.output
+        assert "flarecrawl 0.4.0" in result.output
 
     def test_status_flag(self):
         result = runner.invoke(app, ["--status"])
@@ -321,3 +321,49 @@ class TestFavicon:
         from flarecrawl.cli import _extract_favicons
         result = _extract_favicons("<html><head></head></html>", "https://example.com")
         assert result == []
+
+
+class TestParseAuth:
+    """Test HTTP Basic Auth parsing."""
+
+    def test_parse_auth_valid(self):
+        from flarecrawl.cli import _parse_auth
+        result = _parse_auth("admin:secret")
+        assert result == {"username": "admin", "password": "secret"}
+
+    def test_parse_auth_password_with_colon(self):
+        from flarecrawl.cli import _parse_auth
+        result = _parse_auth("user:pass:with:colons")
+        assert result == {"username": "user", "password": "pass:with:colons"}
+
+    def test_parse_auth_none(self):
+        from flarecrawl.cli import _parse_auth
+        assert _parse_auth(None) is None
+
+    def test_parse_auth_invalid_no_colon(self):
+        from flarecrawl.cli import _parse_auth
+        import typer
+        import pytest
+        with pytest.raises(typer.Exit):
+            _parse_auth("no-colon-here")
+
+    def test_auth_flag_in_all_commands(self):
+        """Verify --auth flag appears in help for all data commands."""
+        commands = ["scrape", "crawl", "map", "download", "extract",
+                    "screenshot", "pdf", "favicon"]
+        for cmd in commands:
+            result = runner.invoke(app, [cmd, "--help"])
+            assert "--auth" in result.output, f"--auth missing from {cmd} help"
+
+
+class TestAuthBodyBuilder:
+    """Test that authenticate flows through _build_body."""
+
+    def test_authenticate_in_body(self):
+        from flarecrawl.client import Client
+        body = Client._build_body(
+            url="https://example.com",
+            authenticate={"username": "admin", "password": "secret"},
+        )
+        assert body["authenticate"] == {"username": "admin", "password": "secret"}
+        assert body["url"] == "https://example.com"

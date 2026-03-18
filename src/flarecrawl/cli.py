@@ -157,6 +157,21 @@ def _parse_body(body_str: str | None, as_json: bool = False) -> dict | None:
     return None  # unreachable
 
 
+def _parse_auth(auth_str: str | None, as_json: bool = False) -> dict | None:
+    """Parse --auth user:pass into authenticate dict for CF API."""
+    if not auth_str:
+        return None
+    if ":" not in auth_str:
+        _error(
+            "Invalid --auth format. Expected user:password",
+            "VALIDATION_ERROR",
+            EXIT_VALIDATION,
+            as_json=as_json,
+        )
+    username, password = auth_str.split(":", 1)
+    return {"username": username, "password": password}
+
+
 def _sanitize_filename(url: str) -> str:
     """Convert URL to safe filename."""
     parsed = urlparse(url)
@@ -372,7 +387,8 @@ def cache_status(
 def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
                    screenshot: bool, full_page_screenshot: bool,
                    raw_body: dict | None, timeout_ms: int | None,
-                   wait_until: str | None = None) -> dict:
+                   wait_until: str | None = None,
+                   authenticate: dict | None = None) -> dict:
     """Scrape a single URL. Returns result dict. Used for concurrent scraping."""
     start = _time.time()
     kwargs = {}
@@ -382,6 +398,8 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
         kwargs["timeout"] = timeout_ms
     if wait_until:
         kwargs["wait_until"] = wait_until
+    if authenticate:
+        kwargs["authenticate"] = authenticate
 
     if raw_body:
         body_copy = {**raw_body, "url": url}
@@ -464,6 +482,7 @@ def scrape(
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body (overrides all flags)")] = None,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
     js: Annotated[bool, typer.Option("--js", help="Wait for JS rendering (networkidle0, slower but captures dynamic content)")] = False,  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501
+    auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
 ):
     """Scrape one or more URLs. Default output is markdown.
 
@@ -477,6 +496,7 @@ def scrape(
         flarecrawl scrape https://a.com https://b.com --json
         flarecrawl scrape --batch urls.txt --workers 5
         flarecrawl scrape --input urls.txt --json
+        flarecrawl scrape https://protected.example.com --auth admin:secret
     """
     # Validate --batch and --input are not both provided
     if batch and input_file:
@@ -496,6 +516,7 @@ def scrape(
     cache_ttl = 0 if no_cache else DEFAULT_CACHE_TTL
     client = _get_client(json_output or is_batch_mode, cache_ttl=cache_ttl)
     raw_body = _parse_body(body, json_output or is_batch_mode)
+    auth_dict = _parse_auth(auth, json_output or is_batch_mode)
 
     # Load URLs
     all_urls = list(urls or [])
@@ -527,7 +548,7 @@ def scrape(
             return await asyncio.to_thread(
                 _scrape_single, client, url, format, wait_for,
                 screenshot, full_page_screenshot, raw_body, timeout,
-                wait_until,
+                wait_until, auth_dict,
             )
 
         def _on_progress(completed: int, total: int, errors: int):
@@ -562,6 +583,8 @@ def scrape(
             kwargs["timeout"] = wait_for
         if timeout:
             kwargs["timeout"] = timeout
+        if auth_dict:
+            kwargs["authenticate"] = auth_dict
         try:
             binary = client.take_screenshot(url, **kwargs)
         except FlareCrawlError as e:
@@ -582,7 +605,7 @@ def scrape(
                 pool.submit(
                     _scrape_single, client, url, format, wait_for,
                     screenshot, full_page_screenshot, raw_body, timeout,
-                    wait_until,
+                    wait_until, auth_dict,
                 ): url
                 for url in all_urls
             }
@@ -605,7 +628,8 @@ def scrape(
         try:
             result = _scrape_single(client, url, format, wait_for, screenshot,
                                     full_page_screenshot, raw_body, timeout,
-                                    wait_until=wait_until)
+                                    wait_until=wait_until,
+                                    authenticate=auth_dict)
             if timing:
                 console.print(f"[dim]{url} — {result['elapsed']:.1f}s[/dim]")
             results.append(result)
@@ -672,6 +696,7 @@ def crawl(
     fields: Annotated[str | None, typer.Option("--fields", help="Comma-separated fields per record")] = None,
     status_check: Annotated[bool, typer.Option("--status", help="Check status of existing job")] = False,
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
+    auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
 ):
     """Crawl a website. Returns JSON by default (like firecrawl).
 
@@ -680,6 +705,7 @@ def crawl(
     Example:
         flarecrawl crawl https://example.com --wait --limit 10
         flarecrawl crawl https://example.com --wait --progress --limit 50
+        flarecrawl crawl https://example.com --wait --limit 50 --auth admin:secret
         flarecrawl crawl JOB_ID --status
         flarecrawl crawl JOB_ID --ndjson --fields url,markdown
     """
@@ -702,6 +728,7 @@ def crawl(
     # Start new crawl
     _validate_url(url_or_job_id, json_output)
     raw_body = _parse_body(body, json_output)
+    auth_dict = _parse_auth(auth, json_output)
 
     if raw_body:
         raw_body.setdefault("url", url_or_job_id)
@@ -731,6 +758,8 @@ def crawl(
             kwargs["include_patterns"] = [p.strip() for p in include_paths.split(",")]
         if exclude_paths:
             kwargs["exclude_patterns"] = [p.strip() for p in exclude_paths.split(",")]
+        if auth_dict:
+            kwargs["authenticate"] = auth_dict
 
         try:
             job_id = client.crawl_start(url_or_job_id, **kwargs)
@@ -822,6 +851,7 @@ def map_urls(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
+    auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
 ):
     """Discover all URLs on a website.
 
@@ -832,11 +862,13 @@ def map_urls(
         flarecrawl map https://example.com
         flarecrawl map https://example.com --json
         flarecrawl map https://example.com --include-subdomains
+        flarecrawl map https://intranet.example.com --auth user:pass
     """
     cache_ttl = 0 if no_cache else DEFAULT_CACHE_TTL
     client = _get_client(json_output, cache_ttl=cache_ttl)
     _validate_url(url, json_output)
     raw_body = _parse_body(body, json_output)
+    auth_dict = _parse_auth(auth, json_output)
 
     try:
         if raw_body:
@@ -849,6 +881,8 @@ def map_urls(
                 kwargs["internal_only"] = False
             else:
                 kwargs["internal_only"] = True
+            if auth_dict:
+                kwargs["authenticate"] = auth_dict
             links = client.get_links(url, **kwargs)
     except FlareCrawlError as e:
         _handle_api_error(e, json_output)
@@ -886,6 +920,7 @@ def download(
     format: Annotated[str, typer.Option("--format", "-f", help="Format: markdown, html")] = "markdown",
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
 ):
     """Download a site into .flarecrawl/ as files.
 
@@ -894,9 +929,11 @@ def download(
     Example:
         flarecrawl download https://example.com --limit 20
         flarecrawl download https://docs.example.com -f html --limit 50
+        flarecrawl download https://intranet.example.com --limit 20 --auth user:pass
     """
     client = _get_client(json_output)
     _validate_url(url, json_output)
+    auth_dict = _parse_auth(auth, json_output)
 
     parsed = urlparse(url)
     site_name = parsed.netloc.replace(":", "-")
@@ -921,6 +958,8 @@ def download(
         kwargs["include_patterns"] = [p.strip() for p in include_paths.split(",")]
     if exclude_paths:
         kwargs["exclude_patterns"] = [p.strip() for p in exclude_paths.split(",")]
+    if auth_dict:
+        kwargs["authenticate"] = auth_dict
 
     try:
         job_id = client.crawl_start(url, **kwargs)
@@ -993,6 +1032,7 @@ def extract(
     workers: Annotated[int, typer.Option("--workers", "-w", help="Parallel workers for batch (max 10)")] = 3,
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
+    auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
 ):
     """AI-powered structured data extraction from web pages.
 
@@ -1003,11 +1043,13 @@ def extract(
         flarecrawl extract "Extract all product names and prices" --urls https://shop.example.com --json
         flarecrawl extract "Get article title and date" --urls https://blog.example.com --schema-file schema.json
         flarecrawl extract "Get page title" --batch urls.txt --workers 5
+        flarecrawl extract "Get credentials" --urls https://intranet.example.com --auth user:pass --json
     """
     is_batch_mode = batch is not None
     cache_ttl = 0 if no_cache else DEFAULT_CACHE_TTL
     client = _get_client(json_output or is_batch_mode, cache_ttl=cache_ttl)
     raw_body = _parse_body(body, json_output or is_batch_mode)
+    auth_dict = _parse_auth(auth, json_output or is_batch_mode)
 
     # Parse URLs from --urls flag
     url_list = []
@@ -1054,9 +1096,13 @@ def extract(
     if is_batch_mode:
         capped_workers = min(workers, DEFAULT_MAX_WORKERS)
 
+        extra_kwargs = {}
+        if auth_dict:
+            extra_kwargs["authenticate"] = auth_dict
+
         async def _extract_one(url: str) -> dict:
             return await asyncio.to_thread(
-                client.extract_json, url, prompt, response_format,
+                client.extract_json, url, prompt, response_format, **extra_kwargs,
             )
 
         def _on_progress(completed: int, total: int, errors: int):
@@ -1088,7 +1134,8 @@ def extract(
                 result = client.post_raw("json", raw_body)
                 extracted = result.get("result", result)
             else:
-                extracted = client.extract_json(url, prompt, response_format)
+                extra = {"authenticate": auth_dict} if auth_dict else {}
+                extracted = client.extract_json(url, prompt, response_format, **extra)
             results.append({"url": url, "data": extracted})
         except FlareCrawlError as e:
             if len(target_urls) == 1:
@@ -1126,6 +1173,7 @@ def screenshot(
     timeout: Annotated[int | None, typer.Option("--timeout", help="Timeout in ms")] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON (base64)")] = False,
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
+    auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
 ):
     """Capture a screenshot of a web page.
 
@@ -1133,10 +1181,12 @@ def screenshot(
         flarecrawl screenshot https://example.com
         flarecrawl screenshot https://example.com -o hero.png --full-page
         flarecrawl screenshot https://example.com --selector "main" -o main.png
+        flarecrawl screenshot https://intranet.example.com --auth user:pass
     """
     client = _get_client(json_output)
     _validate_url(url, json_output)
     raw_body = _parse_body(body, json_output)
+    auth_dict = _parse_auth(auth, json_output)
 
     try:
         if raw_body:
@@ -1158,6 +1208,8 @@ def screenshot(
                 kwargs["wait_for"] = wait_for
             if timeout:
                 kwargs["timeout"] = timeout
+            if auth_dict:
+                kwargs["authenticate"] = auth_dict
             data = client.take_screenshot(url, **kwargs)
     except FlareCrawlError as e:
         _handle_api_error(e, json_output)
@@ -1193,16 +1245,19 @@ def pdf(
     timeout: Annotated[int | None, typer.Option("--timeout", help="Timeout in ms")] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON (base64)")] = False,
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
+    auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
 ):
     """Render a web page as PDF.
 
     Example:
         flarecrawl pdf https://example.com
         flarecrawl pdf https://example.com -o report.pdf --landscape
+        flarecrawl pdf https://intranet.example.com --auth user:pass
     """
     client = _get_client(json_output)
     _validate_url(url, json_output)
     raw_body = _parse_body(body, json_output)
+    auth_dict = _parse_auth(auth, json_output)
 
     try:
         if raw_body:
@@ -1218,6 +1273,8 @@ def pdf(
                 kwargs["print_background"] = True
             if timeout:
                 kwargs["timeout"] = timeout
+            if auth_dict:
+                kwargs["authenticate"] = auth_dict
             data = client.render_pdf(url, **kwargs)
     except FlareCrawlError as e:
         _handle_api_error(e, json_output)
@@ -1291,6 +1348,7 @@ def favicon(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     timeout: Annotated[int | None, typer.Option("--timeout", help="Timeout in ms")] = None,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
+    auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
 ):
     """Extract favicon URL from a web page.
 
@@ -1304,6 +1362,7 @@ def favicon(
     cache_ttl = 0 if no_cache else DEFAULT_CACHE_TTL
     client = _get_client(json_output, cache_ttl=cache_ttl)
     _validate_url(url, json_output)
+    auth_dict = _parse_auth(auth, json_output)
 
     try:
         kwargs = {}
@@ -1311,6 +1370,8 @@ def favicon(
             kwargs["timeout"] = timeout
         # Reject images/media/fonts to speed up — we only need HTML
         kwargs["reject_resources"] = ["image", "media", "font", "stylesheet"]
+        if auth_dict:
+            kwargs["authenticate"] = auth_dict
         html = client.get_content(url, **kwargs)
     except FlareCrawlError as e:
         _handle_api_error(e, json_output)

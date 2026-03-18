@@ -29,6 +29,8 @@
 | Scrape with JS rendering | `flarecrawl scrape URL --js` |
 | Scrape (bypass cache) | `flarecrawl scrape URL --no-cache` |
 | Scrape (custom wait) | `flarecrawl scrape URL --wait-until networkidle2` |
+| Scrape with HTTP Basic Auth | `flarecrawl scrape URL --auth user:pass` |
+| Crawl with HTTP Basic Auth | `flarecrawl crawl URL --wait --limit N --auth user:pass` |
 | Check usage | `flarecrawl usage --json` |
 | Auth status | `flarecrawl auth status --json` |
 | Cache status | `flarecrawl cache status --json` |
@@ -383,6 +385,7 @@ This bypasses all flag processing and sends the body directly. Useful for advanc
 15. **Images/fonts/media/stylesheets skipped** by default for faster text extraction
 16. **Connection pooling + HTTP/2** — persistent session reuses TCP/TLS across requests
 17. **Batch mode fails fast** on auth/permission errors — won't retry 401/403
+18. **Use `--auth user:pass`** for HTTP Basic Auth protected sites — works on all commands
 
 ## Pricing Reference
 
@@ -404,3 +407,13 @@ A typical page scrape uses 100-200ms of browser time. A 30-page crawl uses ~50s 
 | `FLARECRAWL_MAX_RETRIES` | 3 | Max retry attempts on 429/502/503 |
 | `FLARECRAWL_MAX_WORKERS` | 10 | Max parallel workers for batch mode |
 | `FLARECRAWL_TIMEOUT` | 120 | Request timeout in seconds |
+
+## Release Process
+
+When shipping a new version:
+
+1. Bump version in `pyproject.toml` and `src/flarecrawl/__init__.py`
+2. Add entry to the **Recent Updates** table at the top of `README.md`
+3. Update `AGENTS.md` with any new commands, flags, or rules
+4. Run `pytest tests/ -v` — all tests must pass
+5. Commit and tag: `git tag v0.X.0`

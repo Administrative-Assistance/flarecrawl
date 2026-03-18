@@ -9,6 +9,13 @@
 
 CLI that wraps Cloudflare's [Browser Rendering REST API](https://developers.cloudflare.com/browser-rendering/rest-api/) with the same command structure as Firecrawl. Supports scraping, crawling, URL discovery, screenshots, PDFs, and AI-powered data extraction — all running on Cloudflare's headless Chromium infrastructure. Cost-efficient alternative for high-volume use cases (free 10 min/day, then $0.09/hr).
 
+## Recent Updates
+
+| Version | Date | Changes |
+|---------|------|---------|
+| **v0.4.0** | 2026-03-19 | `--auth user:pass` flag on all commands for HTTP Basic Auth protected sites |
+| **v0.3.0** | 2026-03-19 | Batch mode, response caching, connection pooling, HTTP/2, env-var config, 100 tests |
+
 ## Why Flarecrawl?
 
 | | Firecrawl | Flarecrawl |
@@ -123,6 +130,17 @@ flarecrawl scrape https://example.com --wait-until networkidle2
 ```
 
 **Formats:** `markdown` (default), `html`, `links`, `screenshot`, `json` (AI extraction)
+
+### HTTP Basic Auth
+
+All commands support `--auth user:password` for sites protected by HTTP Basic Auth:
+
+```bash
+flarecrawl scrape https://intranet.example.com --auth admin:secret
+flarecrawl crawl https://intranet.example.com --wait --limit 50 --auth admin:secret
+flarecrawl download https://intranet.example.com --limit 20 --auth user:pass
+flarecrawl screenshot https://intranet.example.com --auth user:pass -o page.png
+```
 
 ### crawl — Crawl a website
 
