@@ -348,8 +348,14 @@ class Client:
     # Single-page endpoints
     # ------------------------------------------------------------------
 
+    # Skip loading these resource types by default for text extraction.
+    # Images/fonts/media/stylesheets aren't needed for markdown/HTML/links.
+    _REJECT_RESOURCES_DEFAULT = ["image", "media", "font", "stylesheet"]
+
     def get_content(self, url: str | None = None, **kwargs) -> str:
         """Fetch rendered HTML. Returns HTML string."""
+        if url and "reject_resources" not in kwargs:
+            kwargs["reject_resources"] = self._REJECT_RESOURCES_DEFAULT
         body = self._build_body(url=url, **kwargs)
         result = self._post_json("content", body)
         return result.get("result", result)
@@ -359,8 +365,12 @@ class Client:
 
         Default strategy: try networkidle0 with 5s timeout for JS rendering.
         If the page times out (analytics-heavy), retry with default waitUntil.
-        Override via wait_until kwarg.
+        Skips images/fonts/media/stylesheets for speed.
+        Override via wait_until and reject_resources kwargs.
         """
+        if "reject_resources" not in kwargs:
+            kwargs["reject_resources"] = self._REJECT_RESOURCES_DEFAULT
+
         user_specified_wait = "wait_until" in kwargs
         if not user_specified_wait:
             kwargs["wait_until"] = "networkidle0"
@@ -401,6 +411,8 @@ class Client:
 
     def get_links(self, url: str, **kwargs) -> list[str]:
         """Extract links from page. Returns list of URLs."""
+        if "reject_resources" not in kwargs:
+            kwargs["reject_resources"] = self._REJECT_RESOURCES_DEFAULT
         body = self._build_body(url=url, **kwargs)
         result = self._post_json("links", body)
         return result.get("result", result)
