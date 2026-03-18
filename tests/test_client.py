@@ -119,7 +119,8 @@ class TestClientUrls:
 
     def test_headers(self):
         client = Client(account_id="test-id", api_token="test-token")
-        headers = client._headers()
+        # Headers are now on the persistent session
+        headers = client._session.headers
         assert headers["Authorization"] == "Bearer test-token"
         assert headers["Content-Type"] == "application/json"
 

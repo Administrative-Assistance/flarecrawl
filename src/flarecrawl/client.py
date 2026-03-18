@@ -20,7 +20,11 @@ class FlareCrawlError(Exception):
 
 
 class Client:
-    """Cloudflare Browser Rendering REST API client."""
+    """Cloudflare Browser Rendering REST API client.
+
+    Uses a persistent httpx.Client session with connection pooling for
+    TCP/TLS reuse across requests. Supports context manager protocol.
+    """
 
     BASE_URL = "https://api.cloudflare.com/client/v4/accounts"
     TIMEOUT = 120  # Browser rendering can be slow
@@ -37,16 +41,39 @@ class Client:
         self.browser_ms_used = 0
         # Cache TTL in seconds (0 = disabled)
         self.cache_ttl = cache_ttl
+        # Persistent HTTP session with connection pooling
+        self._session = httpx.Client(
+            headers={
+                "Authorization": f"Bearer {self.api_token}",
+                "Content-Type": "application/json",
+            },
+            limits=httpx.Limits(
+                max_connections=10,
+                max_keepalive_connections=5,
+            ),
+            timeout=httpx.Timeout(self.TIMEOUT),
+            http2=True,
+        )
+
+    def close(self) -> None:
+        """Close the underlying HTTP session."""
+        self._session.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def __del__(self):
+        try:
+            self._session.close()
+        except Exception:
+            pass
 
     @property
     def _base(self) -> str:
         return f"{self.BASE_URL}/{self.account_id}/browser-rendering"
-
-    def _headers(self) -> dict:
-        return {
-            "Authorization": f"Bearer {self.api_token}",
-            "Content-Type": "application/json",
-        }
 
     def _handle_error(self, response: httpx.Response) -> None:
         """Map HTTP status to Fabric error codes."""
@@ -90,11 +117,14 @@ class Client:
                 pass
 
     def _retry_request(self, method: str, url: str, **kwargs) -> httpx.Response:
-        """Execute request with retry on 429/503/502."""
+        """Execute request with retry on 429/503/502.
+
+        Uses the persistent session for connection pooling and TLS reuse.
+        """
         last_exc = None
         for attempt in range(self.MAX_RETRIES):
             try:
-                response = getattr(httpx, method)(url, **kwargs)
+                response = self._session.request(method.upper(), url, **kwargs)
                 if response.status_code not in self.RETRY_CODES or attempt == self.MAX_RETRIES - 1:
                     return response
                 # Retry after backoff
@@ -124,9 +154,7 @@ class Client:
         response = self._retry_request(
             "post",
             f"{self._base}/{endpoint}",
-            headers=self._headers(),
             json=body,
-            timeout=self.TIMEOUT,
         )
         if response.status_code >= 400:
             self._handle_error(response)
@@ -145,9 +173,7 @@ class Client:
         response = self._retry_request(
             "post",
             f"{self._base}/{endpoint}",
-            headers=self._headers(),
             json=body,
-            timeout=self.TIMEOUT,
         )
         if response.status_code >= 400:
             self._handle_error(response)
@@ -159,9 +185,7 @@ class Client:
         response = self._retry_request(
             "get",
             f"{self._base}/{endpoint}",
-            headers=self._headers(),
             params=params,
-            timeout=self.TIMEOUT,
         )
         if response.status_code >= 400:
             self._handle_error(response)
@@ -169,11 +193,9 @@ class Client:
         return response.json()
 
     def _delete(self, endpoint: str) -> dict:
-        """DELETE request."""
-        response = httpx.delete(
+        """DELETE request (also uses session for connection reuse)."""
+        response = self._session.delete(
             f"{self._base}/{endpoint}",
-            headers=self._headers(),
-            timeout=self.TIMEOUT,
         )
         if response.status_code >= 400:
             self._handle_error(response)
@@ -335,7 +357,7 @@ class Client:
     def get_markdown(self, url: str, **kwargs) -> str:
         """Extract markdown from page. Returns markdown string.
 
-        Default strategy: try networkidle0 with 10s timeout for JS rendering.
+        Default strategy: try networkidle0 with 5s timeout for JS rendering.
         If the page times out (analytics-heavy), retry with default waitUntil.
         Override via wait_until kwarg.
         """
