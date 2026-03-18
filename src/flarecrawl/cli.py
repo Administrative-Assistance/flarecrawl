@@ -299,6 +299,57 @@ def auth_logout():
 
 
 # ------------------------------------------------------------------
+# cache — manage response cache
+# ------------------------------------------------------------------
+
+cache_app = typer.Typer(help="Response cache management")
+app.add_typer(cache_app, name="cache")
+
+
+@cache_app.command("clear")
+def cache_clear():
+    """Clear all cached responses.
+
+    Example:
+        flarecrawl cache clear
+    """
+    from . import cache
+    count = cache.clear()
+    console.print(f"Cleared {count} cached response{'s' if count != 1 else ''}")
+
+
+@cache_app.command("status")
+def cache_status(
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+):
+    """Show cache statistics.
+
+    Example:
+        flarecrawl cache status
+        flarecrawl cache status --json
+    """
+    from . import cache
+    cache_dir = cache._cache_dir()
+    entries = list(cache_dir.glob("*.json"))
+    total_bytes = sum(f.stat().st_size for f in entries)
+
+    data = {
+        "entries": len(entries),
+        "size_bytes": total_bytes,
+        "size_human": f"{total_bytes / 1024:.1f} KB" if total_bytes > 0 else "0 KB",
+        "path": str(cache_dir),
+    }
+
+    if json_output:
+        _output_json({"data": data, "meta": {}})
+        return
+
+    console.print(f"Entries: [cyan]{data['entries']}[/cyan]")
+    console.print(f"Size: [cyan]{data['size_human']}[/cyan]")
+    console.print(f"Path: [dim]{data['path']}[/dim]")
+
+
+# ------------------------------------------------------------------
 # scrape — matches firecrawl scrape
 # ------------------------------------------------------------------
 
