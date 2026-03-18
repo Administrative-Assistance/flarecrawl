@@ -352,10 +352,25 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
         if title_match:
             metadata["title"] = title_match.group(1).strip()
         metadata["contentLength"] = len(content)
+        # Word count (split on whitespace)
+        metadata["wordCount"] = len(content.split())
+        # Heading count
+        metadata["headingCount"] = len(re.findall(r"^#{1,6}\s+", content, re.MULTILINE))
+        # Link count
+        metadata["linkCount"] = len(re.findall(r"\[.*?\]\(.*?\)", content))
+        # Description (first non-heading, non-empty paragraph)
+        for line in content.split("\n"):
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and not stripped.startswith("[") and len(stripped) > 20:
+                metadata["description"] = stripped[:200]
+                break
     elif isinstance(content, list):
         metadata["count"] = len(content)
     metadata["sourceURL"] = url
     metadata["browserTimeMs"] = client.browser_ms_used
+    metadata["format"] = format
+    metadata["elapsed"] = result["elapsed"]
+    metadata["cacheHit"] = client.browser_ms_used == 0 and result["elapsed"] < 2
     result["metadata"] = metadata
 
     return result
