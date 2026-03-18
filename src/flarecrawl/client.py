@@ -309,12 +309,18 @@ class Client:
 
     def get_content(self, url: str | None = None, **kwargs) -> str:
         """Fetch rendered HTML. Returns HTML string."""
+        # Default to networkidle0 for better JS rendering unless overridden
+        if url and "wait_until" not in kwargs:
+            kwargs["wait_until"] = "networkidle0"
         body = self._build_body(url=url, **kwargs)
         result = self._post_json("content", body)
         return result.get("result", result)
 
     def get_markdown(self, url: str, **kwargs) -> str:
         """Extract markdown from page. Returns markdown string."""
+        # Default to networkidle0 for better JS rendering unless overridden
+        if "wait_until" not in kwargs:
+            kwargs["wait_until"] = "networkidle0"
         body = self._build_body(url=url, **kwargs)
         result = self._post_json("markdown", body)
         return result.get("result", result)
