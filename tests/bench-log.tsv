@@ -19,3 +19,4 @@ iteration	commit	fc_total	fl_total	delta	status	description
 17	04e79c0	-	-	-	keep	--js flag (opt-in JS rendering, fast by default)
 18	8ee91bf	-	-	-	keep	Expand benchmark to 8 URLs
 19	r3-check	4.30	4.70	-0.10	keep	R3 checkpoint: speed still 4, JS dropped to 4 (trade-off)
+20	r3-final	4.30	4.90	+0.20	keep	R3 FINAL: speed 5! rejectResources+pooling+8URLs. FL wins 5/6 dimensions
