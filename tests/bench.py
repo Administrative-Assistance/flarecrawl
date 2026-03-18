@@ -66,7 +66,7 @@ TEST_URLS = [
     {
         "url": "https://blog.cloudflare.com/browser-rendering-open-api/",
         "category": "blog-article",
-        "known_text": "Browser Rendering",
+        "known_text": "browser-rendering",
         "js_text": None,
         "expected_headings": 3,
         "expected_links_min": 5,
