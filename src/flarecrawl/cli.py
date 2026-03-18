@@ -339,7 +339,23 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
         content = client.get_markdown(url, **kwargs)
 
     elapsed = _time.time() - start
-    return {"url": url, "content": content, "elapsed": round(elapsed, 2)}
+    result = {"url": url, "content": content, "elapsed": round(elapsed, 2)}
+
+    # Extract metadata from content (zero extra API calls)
+    metadata = {}
+    if isinstance(content, str):
+        # Extract title from first markdown heading
+        title_match = re.search(r"^#{1,2}\s+(.+?)$", content, re.MULTILINE)
+        if title_match:
+            metadata["title"] = title_match.group(1).strip()
+        metadata["contentLength"] = len(content)
+    elif isinstance(content, list):
+        metadata["count"] = len(content)
+    metadata["sourceURL"] = url
+    metadata["browserTimeMs"] = client.browser_ms_used
+    result["metadata"] = metadata
+
+    return result
 
 
 @app.command()
@@ -513,6 +529,9 @@ def scrape(
         meta = {"format": format}
         if len(results) > 1:
             meta["count"] = len(results)
+        # Surface metadata from scrape results
+        if len(results) == 1 and "metadata" in results[0]:
+            meta.update(results[0]["metadata"])
         _output_json({"data": data, "meta": meta})
     elif output:
         out_content = "\n\n".join(
