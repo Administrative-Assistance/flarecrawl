@@ -15,3 +15,7 @@ iteration	commit	fc_total	fl_total	delta	status	description
 13	46ea8fe	-	-	-	revert	Remove JS fallback for speed — wrong trade-off
 14	1dd27d3	4.30	1.00	-3.80	revert	Parallel race broke (httpx not thread-safe)
 15	ec09af3	-	-	-	keep	Restored smart JS fallback from round 2
+16	ceee186	-	-	-	keep	rejectResourceTypes (skip images/fonts/media/stylesheets)
+17	04e79c0	-	-	-	keep	--js flag (opt-in JS rendering, fast by default)
+18	8ee91bf	-	-	-	keep	Expand benchmark to 8 URLs
+19	r3-check	4.30	4.70	-0.10	keep	R3 checkpoint: speed still 4, JS dropped to 4 (trade-off)
