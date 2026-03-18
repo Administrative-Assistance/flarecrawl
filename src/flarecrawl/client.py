@@ -8,8 +8,11 @@ from collections.abc import Iterator
 import httpx
 
 from .config import (
-    DEFAULT_CACHE_TTL, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT,
-    get_account_id, get_api_token, track_usage,
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_TIMEOUT,
+    get_account_id,
+    get_api_token,
+    track_usage,
 )
 
 
