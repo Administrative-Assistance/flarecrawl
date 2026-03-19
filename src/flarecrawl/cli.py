@@ -328,17 +328,31 @@ def auth_login(
 ):
     """Authenticate with Cloudflare Browser Rendering.
 
-    Create an API token at https://dash.cloudflare.com/profile/api-tokens
-    with 'Browser Rendering - Edit' permission.
+    Opens the Cloudflare dashboard in your browser to create a token,
+    then prompts for your account ID and token.
 
     Example:
         flarecrawl auth login
         flarecrawl auth login --account-id abc123 --token cftoken
     """
+    import webbrowser
+
+    if not account_id or not token:
+        console.print("\n[bold]Cloudflare Browser Rendering Setup[/bold]\n")
+
     if not account_id:
-        account_id = typer.prompt("Cloudflare Account ID")
+        console.print("1. Open [cyan]https://dash.cloudflare.com[/cyan]")
+        console.print("   Copy your [bold]Account ID[/bold] from the right sidebar\n")
+        if typer.confirm("Open Cloudflare dashboard in browser?", default=True):
+            webbrowser.open("https://dash.cloudflare.com")
+        account_id = typer.prompt("Account ID")
+
     if not token:
-        token = typer.prompt("API Token (Browser Rendering - Edit)", hide_input=True)
+        console.print("\n2. Create an API token with [bold]Browser Rendering - Edit[/bold] permission")
+        console.print("   Custom Token → Account → Browser Rendering → Edit\n")
+        if typer.confirm("Open token creation page in browser?", default=True):
+            webbrowser.open("https://dash.cloudflare.com/profile/api-tokens")
+        token = typer.prompt("API Token", hide_input=True)
 
     # Validate credentials with a lightweight test
     console.print("Validating credentials...", style="dim")
