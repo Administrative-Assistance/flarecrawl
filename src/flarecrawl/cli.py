@@ -9,6 +9,7 @@ import json
 import re
 import sys
 import time as _time
+from datetime import UTC
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlparse
@@ -485,7 +486,10 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
                    only_main_content: bool = False,
                    include_tags: list[str] | None = None,
                    exclude_tags: list[str] | None = None,
-                   user_agent: str | None = None) -> dict:
+                   user_agent: str | None = None,
+                   wait_for_selector: str | None = None,
+                   css_selector: str | None = None,
+                   js_expression: str | None = None) -> dict:
     """Scrape a single URL. Returns result dict. Used for concurrent scraping."""
     start = _time.time()
     kwargs = {}
@@ -501,6 +505,51 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
         kwargs.update(MOBILE_PRESET)
     if user_agent:
         kwargs["user_agent"] = user_agent
+    if wait_for_selector:
+        kwargs["wait_for"] = wait_for_selector
+
+    # --selector: use CF /scrape endpoint for CSS element extraction
+    if css_selector:
+        result_data = client.scrape(url, [css_selector], **kwargs)
+        elapsed = _time.time() - start
+        return {"url": url, "content": result_data, "elapsed": round(elapsed, 2)}
+
+    # --js: inject JS that writes result to DOM, then scrape it back
+    if js_expression:
+        js_code = f"""
+        try {{
+            const __result = eval({json.dumps(js_expression)});
+            const __el = document.createElement('pre');
+            __el.id = '__flarecrawl_js_result';
+            __el.textContent = typeof __result === 'object' ? JSON.stringify(__result) : String(__result);
+            document.body.appendChild(__el);
+        }} catch(e) {{
+            const __el = document.createElement('pre');
+            __el.id = '__flarecrawl_js_result';
+            __el.textContent = JSON.stringify({{error: e.message}});
+            document.body.appendChild(__el);
+        }}
+        """
+        scrape_kwargs = {**kwargs}
+        scrape_kwargs["style_tag"] = ""  # ensure page loads
+        body = client._build_body(url=url, **kwargs)
+        body["addScriptTag"] = [{"content": js_code}]
+        body["elements"] = [{"selector": "#__flarecrawl_js_result"}]
+        result_data = client._post_json("scrape", body)
+        raw = result_data.get("result", [])
+        # Extract the text from the injected element
+        js_result = ""
+        if isinstance(raw, list) and raw:
+            results = raw[0].get("results", [])
+            if results:
+                js_result = results[0].get("text", "")
+        # Try to parse as JSON
+        try:
+            content = json.loads(js_result)
+        except (json.JSONDecodeError, TypeError):
+            content = js_result
+        elapsed = _time.time() - start
+        return {"url": url, "content": content, "elapsed": round(elapsed, 2)}
 
     if raw_body:
         body_copy = {**raw_body, "url": url}
@@ -646,6 +695,11 @@ def scrape(
     exclude_tags: Annotated[str | None, typer.Option("--exclude-tags", help="CSS selectors to remove")] = None,
     diff: Annotated[bool, typer.Option("--diff", help="Show diff against cached version")] = False,
     user_agent: Annotated[str | None, typer.Option("--user-agent", help="Custom User-Agent string")] = None,
+    wait_for_selector: Annotated[str | None, typer.Option("--wait-for-selector", help="Wait for CSS selector")] = None,
+    selector: Annotated[str | None, typer.Option("--selector", help="Extract content from CSS selector")] = None,
+    js_expression: Annotated[str | None, typer.Option("--js-eval", help="Run JS expression, return result")] = None,
+    stdin_mode: Annotated[bool, typer.Option("--stdin", help="Read HTML from stdin (no API call)")] = False,
+    har_output: Annotated[Path | None, typer.Option("--har", help="Save request metadata to HAR file")] = None,
 ):
     """Scrape one or more URLs. Default output is markdown.
 
@@ -663,6 +717,39 @@ def scrape(
         flarecrawl scrape --format images --json
         flarecrawl scrape --format schema --json
     """
+    # Stdin mode: process local HTML without API call
+    if stdin_mode:
+        from .extract import (
+            extract_images,
+            extract_main_content,
+            extract_structured_data,
+            filter_tags,
+            html_to_markdown,
+        )
+        html = sys.stdin.read()
+        if only_main_content:
+            html = extract_main_content(html)
+        if include_tags:
+            html = filter_tags(html, include=[s.strip() for s in include_tags.split(",")])
+        if exclude_tags:
+            html = filter_tags(html, exclude=[s.strip() for s in exclude_tags.split(",")])
+        if format == "images":
+            content = extract_images(html, "")
+        elif format == "schema":
+            content = extract_structured_data(html)
+        elif format == "html":
+            content = html
+        else:
+            content = html_to_markdown(html)
+        result = {"url": "(stdin)", "content": content}
+        if json_output:
+            _output_json({"data": result, "meta": {"format": format, "source": "stdin"}})
+        elif isinstance(content, str):
+            _output_text(content)
+        else:
+            _output_json(content)
+        return
+
     # Validate --batch and --input are not both provided
     if batch and input_file:
         _error(
@@ -732,6 +819,7 @@ def scrape(
                 screenshot, full_page_screenshot, raw_body, timeout,
                 wait_until, auth_dict, mobile,
                 only_main_content, _include, _exclude, user_agent,
+                wait_for_selector, selector, js_expression,
             )
 
         def _on_progress(completed: int, total: int, errors: int):
@@ -794,6 +882,7 @@ def scrape(
                     screenshot, full_page_screenshot, raw_body, timeout,
                     wait_until, auth_dict, mobile,
                     only_main_content, _include, _exclude, user_agent,
+                wait_for_selector, selector, js_expression,
                 ): url
                 for url in all_urls
             }
@@ -822,7 +911,10 @@ def scrape(
                                     only_main_content=only_main_content,
                                     include_tags=_include,
                                     exclude_tags=_exclude,
-                                    user_agent=user_agent)
+                                    user_agent=user_agent,
+                                    wait_for_selector=wait_for_selector,
+                                    css_selector=selector,
+                                    js_expression=js_expression)
             if timing:
                 console.print(f"[dim]{url} — {result['elapsed']:.1f}s[/dim]")
             results.append(result)
@@ -860,6 +952,33 @@ def scrape(
                 r["diff"] = {"added": 0, "removed": 0, "diff": "(no cached version to compare)"}
             # Store current version for next diff
             _cache.put(endpoint + ":diff", cache_body, content_str)
+
+    # HAR capture: save request metadata
+    if har_output and results:
+        from datetime import datetime
+        har_data = {
+            "log": {
+                "version": "1.2",
+                "creator": {"name": "flarecrawl", "version": __version__},
+                "entries": [
+                    {
+                        "startedDateTime": datetime.now(UTC).isoformat(),
+                        "request": {"method": "POST", "url": r.get("url", "")},
+                        "response": {
+                            "status": 200,
+                            "content": {
+                                "size": len(r.get("content", "")) if isinstance(r.get("content"), str) else 0,
+                                "mimeType": "text/html",
+                            },
+                        },
+                        "time": int(r.get("elapsed", 0) * 1000),
+                    }
+                    for r in results
+                ],
+            }
+        }
+        har_output.write_text(json.dumps(har_data, indent=2), encoding="utf-8")
+        console.print(f"[dim]HAR saved: {har_output} ({len(results)} entries)[/dim]")
 
     # Output
     if json_output:
@@ -1735,6 +1854,185 @@ def favicon(
         else:
             best = favicons[0]
             _output_text(best["url"])
+
+
+# ------------------------------------------------------------------
+# discover — feed/sitemap/link discovery
+# ------------------------------------------------------------------
+
+
+@app.command()
+def discover(
+    url: Annotated[str, typer.Argument(help="Base URL to discover content from")],
+    sitemap: Annotated[bool, typer.Option("--sitemap", help="Check XML sitemaps")] = True,
+    feed: Annotated[bool, typer.Option("--feed", help="Check RSS/Atom feeds")] = True,
+    links: Annotated[bool, typer.Option("--links", help="Discover page links")] = True,
+    limit: Annotated[int | None, typer.Option("--limit", help="Max URLs to return")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
+    auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
+    headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
+    user_agent: Annotated[str | None, typer.Option("--user-agent", help="Custom User-Agent string")] = None,
+):
+    """Discover all URLs on a site via sitemaps, RSS feeds, and page links.
+
+    Combines XML sitemap parsing, RSS/Atom feed discovery, and page link
+    extraction into a single unified URL list.
+
+    Example:
+        flarecrawl discover https://example.com --json
+        flarecrawl discover https://example.com --sitemap --no-feed --no-links
+        flarecrawl discover https://example.com --limit 100
+    """
+    import xml.etree.ElementTree as ET
+    from urllib.parse import urljoin, urlparse
+
+    cache_ttl = 0 if no_cache else DEFAULT_CACHE_TTL
+    client = _get_client(json_output, cache_ttl=cache_ttl)
+    _validate_url(url, json_output)
+    auth_dict = _parse_auth(auth, json_output)
+    custom_headers = _parse_headers(headers, json_output)
+    if custom_headers:
+        if auth_dict is None:
+            auth_dict = {}
+        existing = auth_dict.get("extra_headers", {})
+        auth_dict["extra_headers"] = {**custom_headers, **existing}
+
+    parsed = urlparse(url)
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    discovered: dict[str, str] = {}  # url -> source
+
+    kwargs = {}
+    kwargs["reject_resources"] = ["image", "media", "font", "stylesheet"]
+    if auth_dict:
+        kwargs.update(auth_dict)
+    if user_agent:
+        kwargs["user_agent"] = user_agent
+
+    # 1. XML Sitemap
+    if sitemap:
+        console.print("[dim]Checking sitemaps...[/dim]")
+        sitemap_urls_to_check = [f"{base}/sitemap.xml", f"{base}/sitemap_index.xml"]
+        # Also check robots.txt for sitemap directives
+        try:
+            robots_html = client.get_content(f"{base}/robots.txt", **kwargs)
+            for line in robots_html.splitlines():
+                if line.lower().startswith("sitemap:"):
+                    sm_url = line.split(":", 1)[1].strip()
+                    if sm_url and sm_url not in sitemap_urls_to_check:
+                        sitemap_urls_to_check.append(sm_url)
+        except FlareCrawlError:
+            pass
+
+        for sm_url in sitemap_urls_to_check:
+            try:
+                sm_html = client.get_content(sm_url, **kwargs)
+                # Strip HTML wrapper if CF returned rendered version
+                if "<urlset" in sm_html or "<sitemapindex" in sm_html:
+                    # Extract XML from possible HTML wrapper
+                    xml_start = sm_html.find("<?xml")
+                    if xml_start == -1:
+                        xml_start = sm_html.find("<urlset")
+                    if xml_start == -1:
+                        xml_start = sm_html.find("<sitemapindex")
+                    if xml_start >= 0:
+                        xml_text = sm_html[xml_start:]
+                        # Remove any trailing HTML
+                        for end_tag in ("</urlset>", "</sitemapindex>"):
+                            end_pos = xml_text.find(end_tag)
+                            if end_pos >= 0:
+                                xml_text = xml_text[:end_pos + len(end_tag)]
+                        try:
+                            root = ET.fromstring(xml_text)
+                            ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+                            for loc in root.findall(".//sm:loc", ns):
+                                if loc.text:
+                                    discovered[loc.text.strip()] = "sitemap"
+                            # Also check for plain <loc> without namespace
+                            for loc in root.iter():
+                                if loc.tag.endswith("loc") and loc.text:
+                                    discovered.setdefault(loc.text.strip(), "sitemap")
+                        except ET.ParseError:
+                            pass
+            except FlareCrawlError:
+                pass
+        console.print(f"[dim]Sitemaps: {sum(1 for v in discovered.values() if v == 'sitemap')} URLs[/dim]")
+
+    # 2. RSS/Atom feeds
+    if feed:
+        console.print("[dim]Checking feeds...[/dim]")
+        try:
+            html = client.get_content(url, **kwargs)
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, "lxml")
+            feed_urls = []
+            for link_tag in soup.find_all("link", attrs={"type": ["application/rss+xml", "application/atom+xml"]}):
+                href = link_tag.get("href")
+                if href:
+                    feed_urls.append(urljoin(url, href))
+            # Also try common feed paths
+            for feed_path in ["/feed", "/rss", "/atom.xml", "/feed.xml", "/rss.xml"]:
+                feed_urls.append(f"{base}{feed_path}")
+
+            for feed_url in feed_urls[:5]:  # Limit feed checks
+                try:
+                    feed_html = client.get_content(feed_url, **kwargs)
+                    if "<item>" in feed_html or "<entry>" in feed_html:
+                        try:
+                            root = ET.fromstring(feed_html) if "<?xml" in feed_html[:100] else None
+                            if root is None:
+                                # Try extracting XML from rendered HTML
+                                xml_start = feed_html.find("<?xml")
+                                if xml_start >= 0:
+                                    root = ET.fromstring(feed_html[xml_start:])
+                            if root is not None:
+                                for link_el in root.iter():
+                                    if link_el.tag.endswith("link"):
+                                        href = link_el.get("href") or link_el.text
+                                        if href and href.startswith("http"):
+                                            discovered.setdefault(href.strip(), "feed")
+                        except ET.ParseError:
+                            pass
+                except FlareCrawlError:
+                    pass
+        except FlareCrawlError:
+            pass
+        console.print(f"[dim]Feeds: {sum(1 for v in discovered.values() if v == 'feed')} URLs[/dim]")
+
+    # 3. Page links
+    if links:
+        console.print("[dim]Discovering page links...[/dim]")
+        try:
+            page_links = client.get_links(url, **kwargs)
+            for link in page_links:
+                if isinstance(link, str):
+                    discovered.setdefault(link, "links")
+        except FlareCrawlError:
+            pass
+        console.print(f"[dim]Links: {sum(1 for v in discovered.values() if v == 'links')} URLs[/dim]")
+
+    # Apply limit
+    all_urls = list(discovered.items())
+    if limit:
+        all_urls = all_urls[:limit]
+
+    # Output
+    if json_output:
+        data = [{"url": u, "source": s} for u, s in all_urls]
+        meta = {
+            "url": url,
+            "total": len(all_urls),
+            "by_source": {
+                "sitemap": sum(1 for _, s in all_urls if s == "sitemap"),
+                "feed": sum(1 for _, s in all_urls if s == "feed"),
+                "links": sum(1 for _, s in all_urls if s == "links"),
+            },
+        }
+        _output_json({"data": data, "meta": meta})
+    else:
+        for u, s in all_urls:
+            _output_text(f"{u}  [{s}]")
+        console.print(f"\n[dim]Total: {len(all_urls)} URLs[/dim]")
 
 
 # ------------------------------------------------------------------

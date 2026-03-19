@@ -10,7 +10,7 @@
 
 ### 1. `--js "expression"` — Run JavaScript in page, return result
 
-**Status:** Evaluating | **Score:** 3.0 (Impact: 3, Effort: 3, Feasibility: 3)
+**Status:** Built (v0.6.0) | **Score:** 3.0 (Impact: 3, Effort: 3, Feasibility: 3)
 
 **The problem:** SPAs and dynamic sites render content via JavaScript that isn't in the initial HTML. Users currently have no way to extract computed values, DOM state, or JS variables — they can only get the static HTML/markdown output.
 
@@ -24,7 +24,7 @@
 
 ### 2. `--selector ".main"` — Extract content inside a CSS selector
 
-**Status:** Evaluating | **Score:** 3.0 (Impact: 3, Effort: 3, Feasibility: 3)
+**Status:** Built (v0.6.0) | **Score:** 3.0 (Impact: 3, Effort: 3, Feasibility: 3)
 
 **The problem:** `--only-main-content` uses heuristics to find the main content area, but sometimes users know exactly which element they want. A documentation site might use `#docs-content`, a blog might use `.post-body`. There's no way to say "just give me this specific element."
 
@@ -38,7 +38,7 @@
 
 ### 3. `--wait-for ".content"` — Wait for CSS element before capture
 
-**Status:** Evaluating | **Score:** 3.0 (Impact: 3, Effort: 3, Feasibility: 3)
+**Status:** Built (v0.6.0) | **Score:** 3.0 (Impact: 3, Effort: 3, Feasibility: 3)
 
 **The problem:** `--js` flag waits for `networkidle0` which is a blunt instrument — it waits until ALL network activity stops. Some pages never reach idle (analytics pings, WebSocket connections). Users need to say "capture the page once THIS specific element appears" rather than waiting for all network to settle.
 
@@ -52,7 +52,7 @@
 
 ### 4. Stdin piping — `cat page.html | flarecrawl scrape --stdin`
 
-**Status:** Evaluating | **Score:** 2.6 (Impact: 2, Effort: 3, Feasibility: 3)
+**Status:** Built (v0.6.0) | **Score:** 2.6 (Impact: 2, Effort: 3, Feasibility: 3)
 
 **The problem:** Users who already have HTML (from curl, wget, another tool, or saved files) have to save it to disk, then point flarecrawl at a URL. There's no way to pipe HTML directly into the extraction pipeline.
 
@@ -66,7 +66,7 @@
 
 ### 5. Feed/sitemap discovery — `flarecrawl discover URL`
 
-**Status:** Evaluating | **Score:** 2.7 (Impact: 3, Effort: 2, Feasibility: 3)
+**Status:** Built (v0.6.0) | **Score:** 2.7 (Impact: 3, Effort: 2, Feasibility: 3)
 
 **The problem:** Before crawling a site, users need to know what's there. `flarecrawl map` discovers links on a single page, but misses RSS feeds and XML sitemaps that often contain the complete URL inventory. Users manually check `/sitemap.xml`, `/feed`, `/rss` — tedious and error-prone.
 
@@ -180,7 +180,7 @@
 
 ### 13. HAR capture — `--har output.har`
 
-**Status:** Evaluating | **Score:** 1.4 (Impact: 2, Effort: 1, Feasibility: 1)
+**Status:** Built (v0.6.0, lightweight) | **Score:** 1.4 (Impact: 2, Effort: 1, Feasibility: 1)
 
 **The problem:** When debugging scraping failures — blocked requests, missing resources, redirect chains — users have no visibility into what the browser actually did. They see the final content but not the network journey.
 
@@ -258,7 +258,12 @@
 
 | Date | # | Feature | Decision | Rationale |
 |------|---|---------|----------|-----------|
-| | | | | |
+| 2026-03-19 | 1 | `--js-eval` | **Built (v0.6.0)** | Uses addScriptTag + DOM injection workaround since CF has no page.evaluate() |
+| 2026-03-19 | 2 | `--selector` | **Built (v0.6.0)** | Maps directly to CF /scrape endpoint elements field |
+| 2026-03-19 | 3 | `--wait-for-selector` | **Built (v0.6.0)** | Was already plumbed in client, just needed CLI flag |
+| 2026-03-19 | 4 | `--stdin` | **Built (v0.6.0)** | Local processing via extract.py, zero API calls |
+| 2026-03-19 | 5 | `flarecrawl discover` | **Built (v0.6.0)** | Combines sitemap + RSS/Atom + page links discovery |
+| 2026-03-19 | 13 | `--har` | **Built (v0.6.0)** | Lightweight version — request metadata only (CF doesn't expose full HAR) |
 
 ---
 

@@ -13,6 +13,7 @@ CLI that wraps Cloudflare's [Browser Rendering REST API](https://developers.clou
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **v0.6.0** | 2026-03-19 | `--selector`, `--js-eval`, `--wait-for-selector`, `--stdin`, `--har`, `flarecrawl discover` command, 185 tests |
 | **v0.5.4** | 2026-03-19 | `--user-agent` on all commands for custom crawler identity or paywall bypass |
 | **v0.5.3** | 2026-03-19 | Guided `auth login` with browser auto-open for token setup |
 | **v0.5.2** | 2026-03-19 | Content filtering on crawl/download, `--webhook` on crawl, summary+main-content combo, 169 unit tests |
@@ -204,6 +205,44 @@ flarecrawl crawl https://example.com --wait --limit 10 --webhook https://hooks.e
 flarecrawl crawl https://example.com --wait --limit 10 \
   --webhook https://hooks.example.com/crawl \
   --webhook-headers "Authorization: Bearer token123"
+```
+
+### CSS selector extraction & JS execution
+
+```bash
+# Extract content from specific CSS selector
+flarecrawl scrape https://example.com --selector "main" --json
+
+# Wait for a CSS element before capturing (SPAs, lazy-load)
+flarecrawl scrape https://example.com --wait-for-selector ".loaded" --json
+
+# Run JavaScript and return the result
+flarecrawl scrape https://example.com --js-eval "document.title" --json
+flarecrawl scrape https://example.com --js-eval "document.querySelectorAll('a').length" --json
+```
+
+### Stdin piping & HAR capture
+
+```bash
+# Process local HTML without API call
+cat page.html | flarecrawl scrape --stdin --only-main-content
+curl https://example.com | flarecrawl scrape --stdin --format schema --json
+
+# Save request metadata to HAR file
+flarecrawl scrape https://example.com --har requests.har --json
+```
+
+### URL discovery
+
+```bash
+# Discover all URLs via sitemaps, RSS feeds, and page links
+flarecrawl discover https://example.com --json
+
+# Sitemaps only
+flarecrawl discover https://example.com --no-feed --no-links --json
+
+# With limit
+flarecrawl discover https://example.com --limit 100 --json
 ```
 
 ### Change tracking

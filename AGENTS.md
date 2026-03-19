@@ -42,6 +42,12 @@
 | Crawl with content filter | `flarecrawl crawl URL --wait --only-main-content --limit N` |
 | Crawl with webhook | `flarecrawl crawl URL --wait --limit N --webhook https://hooks.example.com` |
 | Custom User-Agent | `flarecrawl scrape URL --user-agent "MyBot/1.0"` |
+| CSS selector extraction | `flarecrawl scrape URL --selector "main" --json` |
+| Wait for element | `flarecrawl scrape URL --wait-for-selector ".loaded" --json` |
+| Run JavaScript | `flarecrawl scrape URL --js-eval "document.title" --json` |
+| Process local HTML | `cat page.html \| flarecrawl scrape --stdin --json` |
+| Save HAR | `flarecrawl scrape URL --har output.har` |
+| Discover URLs (sitemap+feed+links) | `flarecrawl discover URL --json` |
 | Check usage | `flarecrawl usage --json` |
 | Auth status | `flarecrawl auth status --json` |
 | Cache status | `flarecrawl cache status --json` |

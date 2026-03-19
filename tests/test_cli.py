@@ -27,7 +27,7 @@ class TestHelp:
     def test_version(self):
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "flarecrawl 0.5.4" in result.output
+        assert "flarecrawl 0.6.0" in result.output
 
     def test_status_flag(self):
         result = runner.invoke(app, ["--status"])
@@ -592,3 +592,74 @@ class TestUserAgent:
         body = Client._build_body(url="https://example.com",
                                   user_agent="CustomBot/1.0", **preset)
         assert body["userAgent"] == "CustomBot/1.0"
+
+
+class TestNewV060Features:
+    """Test v0.6.0 features: wait-for-selector, selector, js-eval, stdin, discover, har."""
+
+    def test_scrape_has_wait_for_selector(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--wait-for-selector" in result.output
+
+    def test_scrape_has_selector(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--selector" in result.output
+
+    def test_scrape_has_js_eval(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--js-eval" in result.output
+
+    def test_scrape_has_stdin(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--stdin" in result.output
+
+    def test_scrape_has_har(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--har" in result.output
+
+    def test_discover_help(self):
+        result = runner.invoke(app, ["discover", "--help"])
+        assert result.exit_code == 0
+        assert "--sitemap" in result.output
+        assert "--feed" in result.output
+        assert "--links" in result.output
+        assert "--limit" in result.output
+
+    def test_discover_requires_auth(self, no_credentials):
+        result = runner.invoke(app, ["discover", "https://example.com", "--json"])
+        assert result.exit_code == 2
+
+    def test_wait_for_selector_in_body(self):
+        from flarecrawl.client import Client
+        body = Client._build_body(url="https://example.com", wait_for=".content")
+        assert body["waitForSelector"] == {"selector": ".content"}
+
+    def test_stdin_processes_html(self):
+        html = "<html><body><h1>Test Title</h1><p>Content here.</p></body></html>"
+        result = runner.invoke(app, ["scrape", "--stdin", "--json"], input=html)
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert "Test Title" in data["data"]["content"]
+
+    def test_stdin_with_only_main_content(self):
+        html = "<html><body><nav>Nav</nav><main><p>Main content that is long enough to pass the fifty char threshold easily here.</p></main></body></html>"
+        result = runner.invoke(app, ["scrape", "--stdin", "--only-main-content", "--json"], input=html)
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert "Main content" in data["data"]["content"]
+        assert "Nav" not in data["data"]["content"]
+
+    def test_stdin_format_images(self):
+        html = '<html><body><img src="https://example.com/photo.jpg" alt="Photo"></body></html>'
+        result = runner.invoke(app, ["scrape", "--stdin", "--format", "images", "--json"], input=html)
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert len(data["data"]["content"]) == 1
+        assert data["data"]["content"][0]["url"] == "https://example.com/photo.jpg"
+
+    def test_stdin_format_schema(self):
+        html = '''<html><head><script type="application/ld+json">{"@type":"Organization","name":"Test"}</script></head><body></body></html>'''
+        result = runner.invoke(app, ["scrape", "--stdin", "--format", "schema", "--json"], input=html)
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["data"]["content"]["ld_json"][0]["@type"] == "Organization"
