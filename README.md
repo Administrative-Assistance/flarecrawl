@@ -13,6 +13,7 @@ CLI that wraps Cloudflare's [Browser Rendering REST API](https://developers.clou
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **v0.5.3** | 2026-03-19 | Guided `auth login` with browser auto-open for token setup |
 | **v0.5.2** | 2026-03-19 | Content filtering on crawl/download, `--webhook` on crawl, summary+main-content combo, 169 unit tests |
 | **v0.5.1** | 2026-03-19 | Feature test corpus (80 live tests across 8 sites), 158 unit tests, all green |
 | **v0.5.0** | 2026-03-19 | `--only-main-content`, `--include-tags`/`--exclude-tags`, `--mobile`, `--headers`, `--diff`, formats: `images`/`summary`/`schema`, new `schema` command |
@@ -66,10 +67,10 @@ uv venv && uv pip install -e .
 ### 3. Authenticate
 
 ```bash
-# Interactive (prompts for account ID and token)
+# Interactive — opens browser to Cloudflare dashboard for guided setup
 flarecrawl auth login
 
-# Non-interactive
+# Non-interactive (CI/CD)
 flarecrawl auth login --account-id YOUR_ACCOUNT_ID --token YOUR_TOKEN
 ```
 

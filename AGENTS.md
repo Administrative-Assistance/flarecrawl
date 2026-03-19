@@ -49,7 +49,7 @@
 ## Authentication
 
 ```bash
-# Interactive login
+# Interactive login (opens browser for guided token setup)
 flarecrawl auth login
 
 # Non-interactive (CI/CD)
