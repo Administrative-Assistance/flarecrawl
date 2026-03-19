@@ -27,7 +27,7 @@ class TestHelp:
     def test_version(self):
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "flarecrawl 0.7.0" in result.output
+        assert "flarecrawl 0.8.0" in result.output
 
     def test_status_flag(self):
         result = runner.invoke(app, ["--status"])
@@ -744,3 +744,125 @@ class TestMagicFlag:
     def test_scrape_has_magic(self):
         result = runner.invoke(app, ["scrape", "--help"])
         assert "--magic" in result.output
+
+
+class TestV080Features:
+    """Test v0.8.0 features."""
+
+    def test_scrape_has_scroll(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--scroll" in result.output
+
+    def test_scrape_has_query(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--query" in result.output
+
+    def test_scrape_has_precision(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--precision" in result.output
+
+    def test_scrape_has_recall(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--recall" in result.output
+
+    def test_scrape_has_session(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--session" in result.output
+
+    def test_precision_recall_mutually_exclusive(self):
+        result = runner.invoke(app, [
+            "scrape", "https://example.com",
+            "--precision", "--recall", "--json",
+        ])
+        assert result.exit_code == 4
+
+    def test_crawl_has_deduplicate(self):
+        result = runner.invoke(app, ["crawl", "--help"])
+        assert "--deduplicate" in result.output
+
+    def test_batch_help(self):
+        result = runner.invoke(app, ["batch", "--help"])
+        assert result.exit_code == 0
+        assert "YAML" in result.output
+
+    def test_format_accessibility_in_help(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "accessibility" in result.output
+
+
+class TestFilterByQuery:
+    """Test relevance filtering."""
+
+    def test_filter_keeps_relevant(self):
+        from flarecrawl.extract import filter_by_query
+        text = "## Python\n\nPython is a programming language.\n\n## Java\n\nJava is also a language.\n\n## Weather\n\nThe weather is sunny today."
+        result = filter_by_query(text, "Python programming")
+        assert "Python" in result
+        assert "programming" in result
+
+    def test_filter_empty_query(self):
+        from flarecrawl.extract import filter_by_query
+        text = "Some text here."
+        assert filter_by_query(text, "") == text
+
+    def test_filter_no_matches_returns_all(self):
+        from flarecrawl.extract import filter_by_query
+        text = "First paragraph.\n\nSecond paragraph."
+        result = filter_by_query(text, "zzzznonexistent")
+        assert result == text
+
+
+class TestPrecisionRecall:
+    """Test precision/recall extraction modes."""
+
+    def test_precision_strips_more(self):
+        from flarecrawl.extract import extract_main_content_precision
+        html = "<html><body><nav>Nav</nav><article><p>Article content that is long enough to pass the threshold test here easily.</p></article><aside>Side</aside></body></html>"
+        result = extract_main_content_precision(html)
+        assert "Article content" in result
+        assert "Nav" not in result
+        assert "Side" not in result
+
+    def test_recall_keeps_more(self):
+        from flarecrawl.extract import extract_main_content_recall
+        html = "<html><body><div class='content'><p>Content text that is absolutely long enough.</p><p>More content.</p></div><aside>Side</aside></body></html>"
+        result = extract_main_content_recall(html)
+        assert "Content text" in result
+
+
+class TestAccessibilityTree:
+    """Test accessibility tree extraction."""
+
+    def test_extracts_headings(self):
+        from flarecrawl.extract import extract_accessibility_tree
+        html = "<html><body><h1>Title</h1><h2>Subtitle</h2></body></html>"
+        tree = extract_accessibility_tree(html)
+        headings = [n for n in tree if n.get("role") == "heading"]
+        assert len(headings) == 2
+        assert headings[0]["name"] == "Title"
+        assert headings[0]["level"] == 1
+
+    def test_extracts_links(self):
+        from flarecrawl.extract import extract_accessibility_tree
+        html = '<html><body><a href="https://example.com">Example</a></body></html>'
+        tree = extract_accessibility_tree(html)
+        links = [n for n in tree if n.get("role") == "link"]
+        assert len(links) == 1
+        assert links[0]["name"] == "Example"
+        assert links[0]["href"] == "https://example.com"
+
+    def test_extracts_landmarks(self):
+        from flarecrawl.extract import extract_accessibility_tree
+        html = "<html><body><nav>Nav</nav><main>Main</main><footer>Footer</footer></body></html>"
+        tree = extract_accessibility_tree(html)
+        roles = {n["role"] for n in tree}
+        assert "navigation" in roles
+        assert "main" in roles
+        assert "contentinfo" in roles
+
+    def test_extracts_form_controls(self):
+        from flarecrawl.extract import extract_accessibility_tree
+        html = '<html><body><input type="text" placeholder="Name"><button>Submit</button></body></html>'
+        tree = extract_accessibility_tree(html)
+        assert any(n.get("role") == "textbox" for n in tree)
+        assert any(n.get("role") == "button" for n in tree)

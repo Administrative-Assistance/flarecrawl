@@ -345,3 +345,194 @@ def _inline_text(element: Tag) -> str:
             else:
                 parts.append(text)
     return " ".join(p for p in parts if p)
+
+
+# ------------------------------------------------------------------
+# Relevance filtering (BM25-style)
+# ------------------------------------------------------------------
+
+
+def filter_by_query(text: str, query: str, top_k: int = 10) -> str:
+    """Filter text to keep only paragraphs relevant to a query.
+
+    Uses simple TF-IDF-like scoring (no external deps).
+    Splits text into paragraphs, scores each against query terms,
+    returns top_k most relevant paragraphs in original order.
+    """
+    import math
+    from collections import Counter
+
+    if not query or not text:
+        return text
+
+    query_terms = set(query.lower().split())
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+
+    if not paragraphs:
+        return text
+
+    # Score each paragraph by term frequency of query terms
+    scored: list[tuple[int, float, str]] = []
+    for i, para in enumerate(paragraphs):
+        words = para.lower().split()
+        if not words:
+            continue
+        word_counts = Counter(words)
+        # TF-IDF-like: sum of (term_freq / doc_length) for query terms
+        score = sum(
+            (word_counts.get(term, 0) / len(words))
+            * math.log(len(paragraphs) / (1 + sum(1 for p in paragraphs if term in p.lower())))
+            for term in query_terms
+        )
+        # Boost headings that match
+        if para.startswith("#") and any(t in para.lower() for t in query_terms):
+            score *= 2.0
+        scored.append((i, score, para))
+
+    # Keep paragraphs with score > 0, up to top_k, in original order
+    relevant = sorted([s for s in scored if s[1] > 0], key=lambda x: x[1], reverse=True)[:top_k]
+    relevant.sort(key=lambda x: x[0])  # Restore original order
+
+    if not relevant:
+        return text  # No matches, return everything
+
+    return "\n\n".join(para for _, _, para in relevant)
+
+
+# ------------------------------------------------------------------
+# Precision / Recall extraction modes
+# ------------------------------------------------------------------
+
+# Tighter selectors for precision mode
+_PRECISION_SELECTORS = ["article", "main", "[role=main]"]
+_PRECISION_STRIP = {"nav", "footer", "header", "aside", "script", "style",
+                    "noscript", "iframe", "form", "figure", "figcaption",
+                    "table", "ul.nav", ".sidebar", ".menu", ".social",
+                    ".share", ".related", ".comments", ".ad", ".ads"}
+
+# Looser selectors for recall mode (keep more)
+_RECALL_SELECTORS = ["main", "article", "[role=main]", "#content", ".content",
+                     "#main", ".main", "#article", ".article", ".post",
+                     ".entry", ".page-content", "#page-content"]
+_RECALL_STRIP = {"script", "style", "noscript", "iframe"}
+
+
+def extract_main_content_precision(html: str) -> str:
+    """Extract main content with aggressive filtering (precision mode)."""
+    soup = BeautifulSoup(html, "lxml")
+    for selector in _PRECISION_SELECTORS:
+        el = soup.select_one(selector)
+        if el and len(el.get_text(strip=True)) > 100:
+            for tag in el.find_all(_PRECISION_STRIP):
+                tag.decompose()
+            return str(el)
+    # Fallback
+    body = soup.find("body")
+    if body:
+        for tag in body.find_all(_PRECISION_STRIP):
+            tag.decompose()
+        return str(body)
+    return html
+
+
+def extract_main_content_recall(html: str) -> str:
+    """Extract main content with conservative filtering (recall mode)."""
+    soup = BeautifulSoup(html, "lxml")
+    for selector in _RECALL_SELECTORS:
+        el = soup.select_one(selector)
+        if el and len(el.get_text(strip=True)) > 30:
+            for tag in el.find_all(_RECALL_STRIP):
+                tag.decompose()
+            return str(el)
+    body = soup.find("body")
+    if body:
+        for tag in body.find_all(_RECALL_STRIP):
+            tag.decompose()
+        return str(body)
+    return html
+
+
+# ------------------------------------------------------------------
+# Accessibility tree
+# ------------------------------------------------------------------
+
+
+def extract_accessibility_tree(html: str) -> list[dict]:
+    """Extract a simplified accessibility tree from HTML.
+
+    Returns a list of nodes with role, name, level, and children info.
+    Focuses on semantic elements: headings, landmarks, links, buttons,
+    form controls, images, lists, tables.
+    """
+    soup = BeautifulSoup(html, "lxml")
+
+    role_map = {
+        "nav": "navigation",
+        "main": "main",
+        "header": "banner",
+        "footer": "contentinfo",
+        "aside": "complementary",
+        "section": "region",
+        "article": "article",
+        "form": "form",
+        "table": "table",
+        "ul": "list",
+        "ol": "list",
+        "li": "listitem",
+        "a": "link",
+        "button": "button",
+        "input": "textbox",
+        "textarea": "textbox",
+        "select": "combobox",
+        "img": "image",
+    }
+
+    nodes: list[dict] = []
+
+    def _walk_tree(element, depth: int = 0):
+        if not isinstance(element, Tag):
+            return
+
+        tag = element.name
+        role = element.get("role") or role_map.get(tag)
+
+        # Headings
+        if tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
+            nodes.append({
+                "role": "heading",
+                "name": element.get_text(strip=True),
+                "level": int(tag[1]),
+                "depth": depth,
+            })
+            return
+
+        if role:
+            node: dict = {"role": role, "depth": depth}
+            # Name from text, aria-label, alt, title, or placeholder
+            name = (
+                element.get("aria-label")
+                or element.get("alt")
+                or element.get("title")
+                or element.get("placeholder")
+            )
+            if not name and tag in ("a", "button", "li"):
+                name = element.get_text(strip=True)[:100]
+            if name:
+                node["name"] = name
+
+            # Extra attributes
+            if tag == "a":
+                node["href"] = element.get("href", "")
+            if tag == "img":
+                node["src"] = element.get("src", "")
+            if tag == "input":
+                node["type"] = element.get("type", "text")
+
+            nodes.append(node)
+
+        for child in element.children:
+            _walk_tree(child, depth + (1 if role else 0))
+
+    body = soup.find("body") or soup
+    _walk_tree(body)
+    return nodes

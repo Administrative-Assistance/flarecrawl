@@ -52,6 +52,14 @@
 | Remove cookie banners | `flarecrawl scrape URL --magic` |
 | Request language | `flarecrawl scrape URL --language de` |
 | Wayback fallback on 404 | `flarecrawl scrape URL --archived` |
+| Auto-scroll lazy content | `flarecrawl scrape URL --scroll` |
+| Relevance filter | `flarecrawl scrape URL --query "pricing"` |
+| Precision extraction | `flarecrawl scrape URL --precision` |
+| Recall extraction | `flarecrawl scrape URL --recall` |
+| Dedup crawl results | `flarecrawl crawl URL --wait --deduplicate` |
+| Load session cookies | `flarecrawl scrape URL --session cookies.json` |
+| YAML batch config | `flarecrawl batch config.yml` |
+| Accessibility tree | `flarecrawl scrape URL --format accessibility --json` |
 | Check usage | `flarecrawl usage --json` |
 | Auth status | `flarecrawl auth status --json` |
 | Cache status | `flarecrawl cache status --json` |

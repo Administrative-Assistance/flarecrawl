@@ -500,7 +500,11 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
                    css_selector: str | None = None,
                    js_expression: str | None = None,
                    archived: bool = False,
-                   magic: bool = False) -> dict:
+                   magic: bool = False,
+                   scroll: bool = False,
+                   query: str | None = None,
+                   precision: bool = False,
+                   recall: bool = False) -> dict:
     """Scrape a single URL. Returns result dict. Used for concurrent scraping."""
     start = _time.time()
     kwargs = {}
@@ -518,6 +522,24 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
         kwargs["user_agent"] = user_agent
     if wait_for_selector:
         kwargs["wait_for"] = wait_for_selector
+    if scroll:
+        # Inject JS to scroll page to bottom for lazy-loaded content
+        _scroll_js = (
+            "async function __flarecrawlScroll() {"
+            "  const delay = ms => new Promise(r => setTimeout(r, ms));"
+            "  let prev = 0;"
+            "  for (let i = 0; i < 20; i++) {"
+            "    window.scrollTo(0, document.body.scrollHeight);"
+            "    await delay(300);"
+            "    if (document.body.scrollHeight === prev) break;"
+            "    prev = document.body.scrollHeight;"
+            "  }"
+            "  window.scrollTo(0, 0);"
+            "}"
+            "__flarecrawlScroll();"
+        )
+        # Will be applied via addScriptTag in the body builder
+        kwargs.setdefault("_scroll_script", _scroll_js)
     if magic:
         # Hide common cookie banners, GDPR modals, newsletter popups
         kwargs["style_tag"] = (
@@ -582,6 +604,9 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
     _fetch_url = url
     _archive_attempted = False
 
+    # Extract scroll script from kwargs (not a CF API field)
+    _scroll_script = kwargs.pop("_scroll_script", None)
+
     if raw_body:
         body_copy = {**raw_body, "url": _fetch_url}
         endpoint = "markdown" if format == "markdown" else "content"
@@ -633,10 +658,26 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
         from .extract import extract_structured_data
         html = client.get_content(url, **kwargs)
         content = extract_structured_data(html)
+    elif format == "accessibility":
+        from .extract import extract_accessibility_tree
+        html = client.get_content(url, **kwargs)
+        content = extract_accessibility_tree(html)
     elif format == "html":
-        content = client.get_content(url, **kwargs)
+        if _scroll_script:
+            body = client._build_body(url=url, **kwargs)
+            body.setdefault("addScriptTag", []).append({"content": _scroll_script})
+            result_data = client._post_json("content", body)
+            content = result_data.get("result", "")
+        else:
+            content = client.get_content(url, **kwargs)
     else:
-        content = client.get_markdown(url, **kwargs)
+        if _scroll_script:
+            body = client._build_body(url=url, **kwargs)
+            body.setdefault("addScriptTag", []).append({"content": _scroll_script})
+            result_data = client._post_json("markdown", body)
+            content = result_data.get("result", "")
+        else:
+            content = client.get_markdown(url, **kwargs)
 
     # Archived fallback: if content is empty/error and --archived, try Wayback Machine
     if archived and not _archive_attempted:
@@ -654,27 +695,36 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
                 pass  # Keep original content
 
     # Post-processing: main content extraction and tag filtering
-    if isinstance(content, str) and (only_main_content or include_tags or exclude_tags):
+    if isinstance(content, str) and (only_main_content or precision or recall or include_tags or exclude_tags):
         from .extract import extract_main_content as _extract_main
+        from .extract import extract_main_content_precision as _prec
+        from .extract import extract_main_content_recall as _rec
         from .extract import filter_tags as _filter
         from .extract import html_to_markdown as _h2m
-        # Need HTML for filtering — if we got markdown, re-fetch as HTML
-        if format not in ("html",) and not only_main_content:
+        # Need HTML for filtering
+        if format not in ("html",):
             html = client.get_content(url, **kwargs)
-        elif only_main_content:
-            html = client.get_content(url, **kwargs)
-            html = _extract_main(html)
         else:
-            html = content  # already HTML
+            html = content
+
+        if precision:
+            html = _prec(html)
+        elif recall:
+            html = _rec(html)
+        elif only_main_content:
+            html = _extract_main(html)
 
         if include_tags:
             html = _filter(html, include=include_tags)
         if exclude_tags:
             html = _filter(html, exclude=exclude_tags)
 
-        # Convert back to markdown if that was the requested format
-        if format in ("markdown", "html"):
-            content = _h2m(html) if format == "markdown" else html
+        content = _h2m(html) if format == "markdown" else html
+
+    # Post-processing: relevance filter
+    if query and isinstance(content, str):
+        from .extract import filter_by_query
+        content = filter_by_query(content, query)
 
     elapsed = _time.time() - start
     result = {"url": url, "content": content, "elapsed": round(elapsed, 2)}
@@ -716,7 +766,7 @@ def scrape(
     urls: Annotated[list[str], typer.Argument(help="URL(s) to scrape")] = None,
     format: Annotated[
         str,
-        typer.Option("--format", "-f", help="markdown, html, links, screenshot, json, images, summary, schema"),
+        typer.Option("--format", "-f", help="markdown html links screenshot json images summary schema accessibility"),
     ] = "markdown",
     wait_for: Annotated[int | None, typer.Option("--wait-for", help="Wait time in ms")] = None,
     wait_until: Annotated[str | None, typer.Option("--wait-until", help="Page load event: load, domcontentloaded, networkidle0, networkidle2")] = None,  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501
@@ -750,6 +800,11 @@ def scrape(
     archived: Annotated[bool, typer.Option("--archived", help="Fallback to Internet Archive on 404/error")] = False,
     language: Annotated[str | None, typer.Option("--language", help="Accept-Language header (e.g. de, fr, ja)")] = None,
     magic: Annotated[bool, typer.Option("--magic", help="Remove cookie banners and overlays")] = False,
+    scroll: Annotated[bool, typer.Option("--scroll", help="Auto-scroll page for lazy-loaded content")] = False,
+    query: Annotated[str | None, typer.Option("--query", help="Filter content by relevance to query")] = None,
+    precision: Annotated[bool, typer.Option("--precision", help="Aggressive content extraction")] = False,
+    recall: Annotated[bool, typer.Option("--recall", help="Conservative content extraction")] = False,
+    session: Annotated[Path | None, typer.Option("--session", help="Load cookies from session file")] = None,
 ):
     """Scrape one or more URLs. Default output is markdown.
 
@@ -818,6 +873,22 @@ def scrape(
     _include = [s.strip() for s in include_tags.split(",")] if include_tags else None
     _exclude = [s.strip() for s in exclude_tags.split(",")] if exclude_tags else None
 
+    # Validate --precision and --recall are not both provided
+    if precision and recall:
+        _error(
+            "Cannot use both --precision and --recall.",
+            "VALIDATION_ERROR", EXIT_VALIDATION, as_json=json_output,
+        )
+
+    # Load session cookies (after auth_dict is parsed below)
+    _session_cookies = None
+    if session:
+        try:
+            session_data = json.loads(session.read_text())
+            _session_cookies = session_data if isinstance(session_data, list) else session_data.get("cookies", [])
+        except (OSError, json.JSONDecodeError) as e:
+            _error(f"Cannot read session file: {e}", "VALIDATION_ERROR", EXIT_VALIDATION, as_json=json_output)
+
     # Resolve batch file (--batch takes precedence, --input is backward compat)
     batch_file = batch or input_file
     is_batch_mode = batch is not None
@@ -844,6 +915,12 @@ def scrape(
         existing = auth_dict.get("extra_headers", {})
         existing.setdefault("Accept-Language", language)
         auth_dict["extra_headers"] = existing
+
+    # Apply session cookies
+    if _session_cookies:
+        if auth_dict is None:
+            auth_dict = {}
+        auth_dict["cookies"] = _session_cookies
 
     # Load URLs
     all_urls = list(urls or [])
@@ -878,7 +955,7 @@ def scrape(
                 wait_until, auth_dict, mobile,
                 only_main_content, _include, _exclude, user_agent,
                 wait_for_selector, selector, js_expression,
-                archived, magic,
+                archived, magic, scroll, query, precision, recall,
             )
 
         def _on_progress(completed: int, total: int, errors: int):
@@ -942,7 +1019,7 @@ def scrape(
                     wait_until, auth_dict, mobile,
                     only_main_content, _include, _exclude, user_agent,
                 wait_for_selector, selector, js_expression,
-                archived, magic,
+                archived, magic, scroll, query, precision, recall,
                 ): url
                 for url in all_urls
             }
@@ -976,7 +1053,11 @@ def scrape(
                                     css_selector=selector,
                                     js_expression=js_expression,
                                     archived=archived,
-                                    magic=magic)
+                                    magic=magic,
+                                    scroll=scroll,
+                                    query=query,
+                                    precision=precision,
+                                    recall=recall)
             if timing:
                 console.print(f"[dim]{url} — {result['elapsed']:.1f}s[/dim]")
             results.append(result)
@@ -1120,6 +1201,7 @@ def crawl(
     webhook: Annotated[str | None, typer.Option("--webhook", help="POST results to this URL on completion")] = None,
     webhook_headers: Annotated[list[str] | None, typer.Option("--webhook-headers", help="Headers for webhook")] = None,
     user_agent: Annotated[str | None, typer.Option("--user-agent", help="Custom User-Agent string")] = None,
+    deduplicate: Annotated[bool, typer.Option("--deduplicate", help="Skip duplicate content")] = False,
 ):
     """Crawl a website. Returns JSON by default (like firecrawl).
 
@@ -1238,8 +1320,16 @@ def crawl(
         if ndjson:
             # Stream mode: output one record per line as they come
             count = 0
+            _ndjson_hashes: set[str] = set()
             for record in client.crawl_get_all(job_id):
                 record = _filter_record_content(record, only_main_content, _inc, _exc)
+                if deduplicate:
+                    import hashlib
+                    ct = record.get("markdown", "") or record.get("html", "")
+                    h = hashlib.md5(ct.encode()).hexdigest()
+                    if h in _ndjson_hashes:
+                        continue
+                    _ndjson_hashes.add(h)
                 if fields:
                     record = _filter_fields(record, fields)
                 _output_ndjson(record)
@@ -1248,10 +1338,18 @@ def crawl(
                 console.print(f"[dim]Browser time: {client.browser_ms_used}ms ({count} records)[/dim]")
             return
 
-        records = [
-            _filter_record_content(r, only_main_content, _inc, _exc)
-            for r in client.crawl_get_all(job_id)
-        ]
+        _seen_hashes: set[str] = set()
+        records = []
+        for r in client.crawl_get_all(job_id):
+            r = _filter_record_content(r, only_main_content, _inc, _exc)
+            if deduplicate:
+                import hashlib
+                content_text = r.get("markdown", "") or r.get("html", "")
+                h = hashlib.md5(content_text.encode()).hexdigest()
+                if h in _seen_hashes:
+                    continue
+                _seen_hashes.add(h)
+            records.append(r)
     except FlareCrawlError as e:
         _handle_api_error(e, json_output)
         return
@@ -1941,6 +2039,100 @@ def favicon(
         else:
             best = favicons[0]
             _output_text(best["url"])
+
+
+# ------------------------------------------------------------------
+# batch — YAML config batch operations
+# ------------------------------------------------------------------
+
+
+@app.command("batch")
+def batch_config(
+    config_file: Annotated[Path, typer.Argument(help="YAML config file")],
+    workers: Annotated[int, typer.Option("--workers", "-w", help="Parallel workers")] = 3,
+):
+    """Run batch operations from a YAML config file.
+
+    Config format (list of scrape jobs):
+        - url: https://example.com
+          format: markdown
+          output: example.md
+        - url: https://other.com
+          format: images
+          selector: main
+          json: true
+
+    Example:
+        flarecrawl batch config.yml
+        flarecrawl batch config.yml --workers 5
+    """
+    try:
+        import yaml
+    except ImportError:
+        _error("PyYAML required for batch config. Install: pip install pyyaml",
+               "VALIDATION_ERROR", EXIT_VALIDATION)
+        return
+
+    try:
+        jobs = yaml.safe_load(config_file.read_text())
+    except (OSError, yaml.YAMLError) as e:
+        _error(f"Cannot read config: {e}", "VALIDATION_ERROR", EXIT_VALIDATION)
+        return
+
+    if not isinstance(jobs, list):
+        _error("Config must be a YAML list of jobs", "VALIDATION_ERROR", EXIT_VALIDATION)
+        return
+
+    client = _get_client(True)
+
+    console.print(f"[dim]Running {len(jobs)} jobs from {config_file}...[/dim]")
+
+    for i, job in enumerate(jobs):
+        if not isinstance(job, dict) or "url" not in job:
+            console.print(f"[yellow]Job {i}: missing 'url', skipping[/yellow]")
+            continue
+
+        url = job["url"]
+        fmt = job.get("format", "markdown")
+        out_file = job.get("output")
+
+        console.print(f"[dim]{i + 1}/{len(jobs)} {url} ({fmt})[/dim]")
+
+        try:
+            result = _scrape_single(
+                client, url, fmt,
+                wait_for=None, screenshot=False, full_page_screenshot=False,
+                raw_body=None, timeout_ms=job.get("timeout"),
+                wait_until=job.get("wait_until"),
+                css_selector=job.get("selector"),
+                only_main_content=job.get("only_main_content", False),
+            )
+
+            content = result.get("content", "")
+
+            if out_file:
+                Path(out_file).parent.mkdir(parents=True, exist_ok=True)
+                if isinstance(content, str):
+                    Path(out_file).write_text(content, encoding="utf-8")
+                else:
+                    Path(out_file).write_text(
+                        json.dumps(content, indent=2, default=str), encoding="utf-8"
+                    )
+                console.print(f"  [green]Saved: {out_file}[/green]")
+            elif job.get("json"):
+                _output_ndjson({"index": i, "status": "ok", "data": result})
+            else:
+                if isinstance(content, str):
+                    _output_text(content)
+                else:
+                    _output_json(content)
+
+        except FlareCrawlError as e:
+            console.print(f"  [red]Error: {e}[/red]")
+            if job.get("json"):
+                _output_ndjson({"index": i, "status": "error", "error": str(e)})
+
+    console.print(f"[dim]Batch complete: {len(jobs)} jobs[/dim]")
 
 
 # ------------------------------------------------------------------
