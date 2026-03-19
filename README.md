@@ -13,6 +13,7 @@ CLI that wraps Cloudflare's [Browser Rendering REST API](https://developers.clou
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **v0.5.2** | 2026-03-19 | Content filtering on crawl/download, `--webhook` on crawl, summary+main-content combo, 169 unit tests |
 | **v0.5.1** | 2026-03-19 | Feature test corpus (80 live tests across 8 sites), 158 unit tests, all green |
 | **v0.5.0** | 2026-03-19 | `--only-main-content`, `--include-tags`/`--exclude-tags`, `--mobile`, `--headers`, `--diff`, formats: `images`/`summary`/`schema`, new `schema` command |
 | **v0.4.0** | 2026-03-19 | `--auth user:pass` flag on all commands for HTTP Basic Auth protected sites |
@@ -185,6 +186,18 @@ flarecrawl scrape https://example.com --format schema --json
 flarecrawl schema https://example.com --json
 flarecrawl schema https://example.com --type ld-json --json
 flarecrawl schema https://example.com --type opengraph --json
+```
+
+### Webhooks
+
+```bash
+# POST crawl results to a URL when complete
+flarecrawl crawl https://example.com --wait --limit 10 --webhook https://hooks.example.com/crawl
+
+# With custom headers (e.g. auth token)
+flarecrawl crawl https://example.com --wait --limit 10 \
+  --webhook https://hooks.example.com/crawl \
+  --webhook-headers "Authorization: Bearer token123"
 ```
 
 ### Change tracking

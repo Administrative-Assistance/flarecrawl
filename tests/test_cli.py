@@ -27,7 +27,7 @@ class TestHelp:
     def test_version(self):
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "flarecrawl 0.5.1" in result.output
+        assert "flarecrawl 0.5.2" in result.output
 
     def test_status_flag(self):
         result = runner.invoke(app, ["--status"])
@@ -494,3 +494,73 @@ class TestSchemaCommand:
     def test_schema_requires_auth(self, no_credentials):
         result = runner.invoke(app, ["schema", "https://example.com", "--json"])
         assert result.exit_code == 2
+
+
+class TestCrawlContentFiltering:
+    """Test content filtering flags on crawl command."""
+
+    def test_crawl_has_only_main_content(self):
+        result = runner.invoke(app, ["crawl", "--help"])
+        assert "--only-main-content" in result.output
+
+    def test_crawl_has_exclude_tags(self):
+        result = runner.invoke(app, ["crawl", "--help"])
+        assert "--exclude-tags" in result.output
+
+    def test_crawl_has_include_tags(self):
+        result = runner.invoke(app, ["crawl", "--help"])
+        assert "--include-tags" in result.output
+
+
+class TestDownloadContentFiltering:
+    """Test content filtering flags on download command."""
+
+    def test_download_has_only_main_content(self):
+        result = runner.invoke(app, ["download", "--help"])
+        assert "--only-main-content" in result.output
+
+    def test_download_has_exclude_tags(self):
+        result = runner.invoke(app, ["download", "--help"])
+        assert "--exclude-tags" in result.output
+
+    def test_download_has_include_tags(self):
+        result = runner.invoke(app, ["download", "--help"])
+        assert "--include-tags" in result.output
+
+
+class TestWebhook:
+    """Test webhook flag on crawl command."""
+
+    def test_crawl_has_webhook(self):
+        result = runner.invoke(app, ["crawl", "--help"])
+        assert "--webhook" in result.output
+
+    def test_crawl_has_webhook_headers(self):
+        result = runner.invoke(app, ["crawl", "--help"])
+        assert "--webhook-headers" in result.output
+
+
+class TestFilterRecordContent:
+    """Test _filter_record_content helper."""
+
+    def test_no_filters_returns_unchanged(self):
+        from flarecrawl.cli import _filter_record_content
+        record = {"url": "https://example.com", "markdown": "# Title\nContent"}
+        result = _filter_record_content(record)
+        assert result["markdown"] == "# Title\nContent"
+
+    def test_only_main_content_filters_html(self):
+        from flarecrawl.cli import _filter_record_content
+        html = "<html><body><nav>Nav</nav><main><p>Main content long enough to pass threshold test easily here.</p></main></body></html>"
+        record = {"url": "https://example.com", "html": html}
+        result = _filter_record_content(record, only_main_content=True)
+        assert "Main content" in result["html"]
+        assert "Nav" not in result["html"]
+
+    def test_exclude_tags_filters_html(self):
+        from flarecrawl.cli import _filter_record_content
+        html = "<html><body><p>Content</p><nav>Nav</nav></body></html>"
+        record = {"url": "https://example.com", "html": html}
+        result = _filter_record_content(record, exclude_tags=["nav"])
+        assert "Content" in result["html"]
+        assert "Nav" not in result["html"]

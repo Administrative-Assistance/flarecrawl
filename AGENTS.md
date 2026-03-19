@@ -39,6 +39,8 @@
 | Extract structured data | `flarecrawl schema URL --json` |
 | AI summary | `flarecrawl scrape URL --format summary --json` |
 | Diff against cache | `flarecrawl scrape URL --diff --json` |
+| Crawl with content filter | `flarecrawl crawl URL --wait --only-main-content --limit N` |
+| Crawl with webhook | `flarecrawl crawl URL --wait --limit N --webhook https://hooks.example.com` |
 | Check usage | `flarecrawl usage --json` |
 | Auth status | `flarecrawl auth status --json` |
 | Cache status | `flarecrawl cache status --json` |

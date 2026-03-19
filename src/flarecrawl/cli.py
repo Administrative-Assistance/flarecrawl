@@ -229,6 +229,37 @@ def _sanitize_filename(url: str) -> str:
     return name or "index"
 
 
+def _filter_record_content(
+    record: dict,
+    only_main_content: bool = False,
+    include_tags: list[str] | None = None,
+    exclude_tags: list[str] | None = None,
+) -> dict:
+    """Apply content filtering to a crawl/download record in-place."""
+    if not (only_main_content or include_tags or exclude_tags):
+        return record
+    for key in ("markdown", "html"):
+        content = record.get(key)
+        if not content or not isinstance(content, str):
+            continue
+        from .extract import extract_main_content, filter_tags, html_to_markdown
+        # For markdown, we need to work with the HTML version
+        # But crawl records may only have markdown. In that case, skip HTML-based filtering.
+        if key == "html" or "<" in content[:100]:
+            html = content
+            if only_main_content:
+                html = extract_main_content(html)
+            if include_tags:
+                html = filter_tags(html, include=include_tags)
+            if exclude_tags:
+                html = filter_tags(html, exclude=exclude_tags)
+            if key == "html":
+                record[key] = html
+            else:
+                record[key] = html_to_markdown(html)
+    return record
+
+
 def _get_client(as_json: bool = False, cache_ttl: int = 3600) -> Client:
     """Get authenticated client."""
     _require_auth(as_json)
@@ -478,11 +509,29 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
         html = client.get_content(url, **kwargs)
         content = extract_images(html, url)
     elif format == "summary":
-        content = client.extract_json(
-            url,
-            prompt="Summarize the main content in 2-3 concise paragraphs. Focus on key takeaways.",
-            **kwargs,
-        )
+        if only_main_content or include_tags or exclude_tags:
+            from .extract import extract_main_content as _mc
+            from .extract import filter_tags as _ft
+            from .extract import html_to_markdown as _md
+            html = client.get_content(url, **kwargs)
+            if only_main_content:
+                html = _mc(html)
+            if include_tags:
+                html = _ft(html, include=include_tags)
+            if exclude_tags:
+                html = _ft(html, exclude=exclude_tags)
+            text = _md(html)
+            content = client.extract_json(
+                url,
+                prompt=f"Summarize this content in 2-3 concise paragraphs:\n\n{text[:8000]}",
+                **kwargs,
+            )
+        else:
+            content = client.extract_json(
+                url,
+                prompt="Summarize the main content in 2-3 concise paragraphs. Focus on key takeaways.",
+                **kwargs,
+            )
     elif format == "schema":
         from .extract import extract_structured_data
         html = client.get_content(url, **kwargs)
@@ -848,6 +897,11 @@ def crawl(
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
     auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
     headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
+    only_main_content: Annotated[bool, typer.Option("--only-main-content", help="Keep main content only")] = False,
+    exclude_tags: Annotated[str | None, typer.Option("--exclude-tags", help="CSS selectors to remove")] = None,
+    include_tags: Annotated[str | None, typer.Option("--include-tags", help="CSS selectors to keep")] = None,
+    webhook: Annotated[str | None, typer.Option("--webhook", help="POST results to this URL on completion")] = None,
+    webhook_headers: Annotated[list[str] | None, typer.Option("--webhook-headers", help="Headers for webhook")] = None,
 ):
     """Crawl a website. Returns JSON by default (like firecrawl).
 
@@ -861,6 +915,10 @@ def crawl(
         flarecrawl crawl JOB_ID --ndjson --fields url,markdown
     """
     client = _get_client(json_output)
+
+    # Parse content filtering
+    _inc = [s.strip() for s in include_tags.split(",")] if include_tags else None
+    _exc = [s.strip() for s in exclude_tags.split(",")] if exclude_tags else None
 
     # If it looks like a job ID (UUID-like), check status
     is_job_id = not url_or_job_id.startswith("http") or status_check
@@ -961,6 +1019,7 @@ def crawl(
             # Stream mode: output one record per line as they come
             count = 0
             for record in client.crawl_get_all(job_id):
+                record = _filter_record_content(record, only_main_content, _inc, _exc)
                 if fields:
                     record = _filter_fields(record, fields)
                 _output_ndjson(record)
@@ -969,7 +1028,10 @@ def crawl(
                 console.print(f"[dim]Browser time: {client.browser_ms_used}ms ({count} records)[/dim]")
             return
 
-        records = list(client.crawl_get_all(job_id))
+        records = [
+            _filter_record_content(r, only_main_content, _inc, _exc)
+            for r in client.crawl_get_all(job_id)
+        ]
     except FlareCrawlError as e:
         _handle_api_error(e, json_output)
         return
@@ -984,6 +1046,18 @@ def crawl(
 
     if fields:
         result["records"] = _filter_fields(result["records"], fields)
+
+    # Webhook: POST results to URL on completion
+    if webhook:
+        import httpx as _httpx
+        wh_headers = _parse_headers(webhook_headers) or {}
+        wh_headers.setdefault("Content-Type", "application/json")
+        payload = {"data": result, "meta": {"count": len(records)}}
+        try:
+            resp = _httpx.post(webhook, json=payload, headers=wh_headers, timeout=30)
+            console.print(f"[dim]Webhook: POST {webhook} → {resp.status_code}[/dim]")
+        except Exception as e:
+            console.print(f"[yellow]Webhook failed:[/yellow] {e}")
 
     if output:
         output.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
@@ -1086,6 +1160,9 @@ def download(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
     headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
+    only_main_content: Annotated[bool, typer.Option("--only-main-content", help="Keep main content only")] = False,
+    exclude_tags: Annotated[str | None, typer.Option("--exclude-tags", help="CSS selectors to remove")] = None,
+    include_tags: Annotated[str | None, typer.Option("--include-tags", help="CSS selectors to keep")] = None,
 ):
     """Download a site into .flarecrawl/ as files.
 
@@ -1152,12 +1229,17 @@ def download(
             _handle_api_error(e, json_output)
             return
 
+    # Parse content filtering
+    _inc = [s.strip() for s in include_tags.split(",")] if include_tags else None
+    _exc = [s.strip() for s in exclude_tags.split(",")] if exclude_tags else None
+
     # Save results
     output_dir.mkdir(parents=True, exist_ok=True)
     saved = 0
     errors = 0
 
     for record in client.crawl_get_all(job_id, status="completed"):
+        record = _filter_record_content(record, only_main_content, _inc, _exc)
         page_url = record.get("url", "")
         content_key = format  # "markdown" or "html"
         content = record.get(content_key, "")
