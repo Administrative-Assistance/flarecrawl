@@ -1,6 +1,6 @@
 [project]
 name = "flarecrawl"
-version = "0.4.0"
+version = "0.5.0"
 description = "Cloudflare Browser Rendering CLI - Firecrawl-compatible, cost-efficient at scale"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -11,6 +11,8 @@ dependencies = [
     "typer>=0.9.0",
     "rich>=13.0.0",
     "httpx[http2]>=0.25.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
 ]
 
 [project.optional-dependencies]
@@ -34,7 +36,7 @@ packages = ["src/flarecrawl"]
 # ============================================================
 [tool.clique]
 description = "Cloudflare Browser Rendering - scrape, crawl, map, download, extract, screenshot, pdf, favicon"
-resources = ["scrape", "crawl", "map", "download", "extract", "screenshot", "pdf", "favicon"]
+resources = ["scrape", "crawl", "map", "download", "extract", "screenshot", "pdf", "favicon", "schema"]
 auth = "api_key"
 status = "experimental"
 origin = "clique"

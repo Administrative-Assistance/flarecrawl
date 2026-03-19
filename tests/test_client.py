@@ -167,6 +167,40 @@ class TestClientUrls:
         assert headers["Content-Type"] == "application/json"
 
 
+class TestMobilePreset:
+    """Test mobile device preset."""
+
+    def test_mobile_preset_exists(self):
+        from flarecrawl.client import MOBILE_PRESET
+        assert "width" in MOBILE_PRESET
+        assert "height" in MOBILE_PRESET
+        assert "user_agent" in MOBILE_PRESET
+        assert "device_scale_factor" in MOBILE_PRESET
+
+    def test_mobile_preset_values(self):
+        from flarecrawl.client import MOBILE_PRESET
+        assert MOBILE_PRESET["width"] == 390
+        assert MOBILE_PRESET["height"] == 844
+        assert MOBILE_PRESET["device_scale_factor"] == 3
+        assert "iPhone" in MOBILE_PRESET["user_agent"]
+
+    def test_mobile_in_body(self):
+        from flarecrawl.client import MOBILE_PRESET
+        body = Client._build_body(url="https://example.com", **MOBILE_PRESET)
+        assert body["viewport"]["width"] == 390
+        assert body["viewport"]["height"] == 844
+        assert body["viewport"]["deviceScaleFactor"] == 3
+        assert "iPhone" in body["userAgent"]
+
+    def test_mobile_flag_in_scrape_help(self):
+        from typer.testing import CliRunner
+        from flarecrawl.cli import app
+        runner = CliRunner()
+        for cmd in ["scrape", "screenshot", "pdf"]:
+            result = runner.invoke(app, [cmd, "--help"])
+            assert "--mobile" in result.output, f"--mobile missing from {cmd} help"
+
+
 class TestBrowserTimeTracking:
     """Test browser time accumulation."""
 

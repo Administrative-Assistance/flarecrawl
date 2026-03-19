@@ -13,6 +13,7 @@ CLI that wraps Cloudflare's [Browser Rendering REST API](https://developers.clou
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **v0.5.0** | 2026-03-19 | `--only-main-content`, `--include-tags`/`--exclude-tags`, `--mobile`, `--headers`, `--diff`, formats: `images`/`summary`/`schema`, new `schema` command |
 | **v0.4.0** | 2026-03-19 | `--auth user:pass` flag on all commands for HTTP Basic Auth protected sites |
 | **v0.3.0** | 2026-03-19 | Batch mode, response caching, connection pooling, HTTP/2, env-var config, 100 tests |
 

@@ -21,7 +21,7 @@ from rich.table import Table
 
 from . import __version__
 from .batch import parse_batch_file, process_batch
-from .client import Client, FlareCrawlError
+from .client import MOBILE_PRESET, Client, FlareCrawlError
 from .config import (
     DEFAULT_CACHE_TTL,
     DEFAULT_MAX_WORKERS,
@@ -185,6 +185,40 @@ def _parse_auth(auth_str: str | None, as_json: bool = False) -> dict | None:
     }
 
 
+def _parse_headers(headers: list[str] | None, as_json: bool = False) -> dict | None:
+    """Parse --headers values into a dict for setExtraHTTPHeaders.
+
+    Accepts:
+      - "Key: Value" (curl-style, split on first colon)
+      - '{"Key": "Value"}' (JSON object)
+    Multiple values are merged into a single dict.
+    """
+    if not headers:
+        return None
+    result: dict[str, str] = {}
+    for h in headers:
+        h = h.strip()
+        if h.startswith("{"):
+            try:
+                parsed = json.loads(h)
+                result.update(parsed)
+            except json.JSONDecodeError as e:
+                _error(
+                    f"Invalid --headers JSON: {e}",
+                    "VALIDATION_ERROR", EXIT_VALIDATION, as_json=as_json,
+                )
+        elif ":" in h:
+            key, value = h.split(":", 1)
+            result[key.strip()] = value.strip()
+        else:
+            _error(
+                f"Invalid --headers format: {h!r} (expected 'Key: Value' or JSON)",
+                "VALIDATION_ERROR", EXIT_VALIDATION, as_json=as_json,
+            )
+    return result if result else None
+
+
+
 def _sanitize_filename(url: str) -> str:
     """Convert URL to safe filename."""
     parsed = urlparse(url)
@@ -293,7 +327,7 @@ def auth_login(
             console.print("Add: Account > Browser Rendering > Edit")
         elif "route" in str(e).lower() or status == 404:
             console.print("[red]Account not found:[/red] Check your account ID")
-            console.print("Find it at: https://dash.cloudflare.com > any domain > Overview > Account ID (right sidebar)")
+            console.print("Find it at: https://dash.cloudflare.com > Overview > Account ID")
         else:
             console.print(f"[yellow]Validation warning:[/yellow] {e}")
             console.print("This may be a temporary issue. Credentials saved -- try a scrape to verify.")
@@ -401,7 +435,11 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
                    screenshot: bool, full_page_screenshot: bool,
                    raw_body: dict | None, timeout_ms: int | None,
                    wait_until: str | None = None,
-                   auth_kwargs: dict | None = None) -> dict:
+                   auth_kwargs: dict | None = None,
+                   mobile: bool = False,
+                   only_main_content: bool = False,
+                   include_tags: list[str] | None = None,
+                   exclude_tags: list[str] | None = None) -> dict:
     """Scrape a single URL. Returns result dict. Used for concurrent scraping."""
     start = _time.time()
     kwargs = {}
@@ -413,6 +451,8 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
         kwargs["wait_until"] = wait_until
     if auth_kwargs:
         kwargs.update(auth_kwargs)
+    if mobile:
+        kwargs.update(MOBILE_PRESET)
 
     if raw_body:
         body_copy = {**raw_body, "url": url}
@@ -433,10 +473,47 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
             "encoding": "base64",
             "size": len(binary),
         }
+    elif format == "images":
+        from .extract import extract_images
+        html = client.get_content(url, **kwargs)
+        content = extract_images(html, url)
+    elif format == "summary":
+        content = client.extract_json(
+            url,
+            prompt="Summarize the main content in 2-3 concise paragraphs. Focus on key takeaways.",
+            **kwargs,
+        )
+    elif format == "schema":
+        from .extract import extract_structured_data
+        html = client.get_content(url, **kwargs)
+        content = extract_structured_data(html)
     elif format == "html":
         content = client.get_content(url, **kwargs)
     else:
         content = client.get_markdown(url, **kwargs)
+
+    # Post-processing: main content extraction and tag filtering
+    if isinstance(content, str) and (only_main_content or include_tags or exclude_tags):
+        from .extract import extract_main_content as _extract_main
+        from .extract import filter_tags as _filter
+        from .extract import html_to_markdown as _h2m
+        # Need HTML for filtering — if we got markdown, re-fetch as HTML
+        if format not in ("html",) and not only_main_content:
+            html = client.get_content(url, **kwargs)
+        elif only_main_content:
+            html = client.get_content(url, **kwargs)
+            html = _extract_main(html)
+        else:
+            html = content  # already HTML
+
+        if include_tags:
+            html = _filter(html, include=include_tags)
+        if exclude_tags:
+            html = _filter(html, exclude=exclude_tags)
+
+        # Convert back to markdown if that was the requested format
+        if format in ("markdown", "html"):
+            content = _h2m(html) if format == "markdown" else html
 
     elapsed = _time.time() - start
     result = {"url": url, "content": content, "elapsed": round(elapsed, 2)}
@@ -478,7 +555,7 @@ def scrape(
     urls: Annotated[list[str], typer.Argument(help="URL(s) to scrape")] = None,
     format: Annotated[
         str,
-        typer.Option("--format", "-f", help="Output format: markdown, html, links, screenshot, json"),
+        typer.Option("--format", "-f", help="markdown, html, links, screenshot, json, images, summary, schema"),
     ] = "markdown",
     wait_for: Annotated[int | None, typer.Option("--wait-for", help="Wait time in ms")] = None,
     wait_until: Annotated[str | None, typer.Option("--wait-until", help="Page load event: load, domcontentloaded, networkidle0, networkidle2")] = None,  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501
@@ -496,6 +573,12 @@ def scrape(
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
     js: Annotated[bool, typer.Option("--js", help="Wait for JS rendering (networkidle0, slower but captures dynamic content)")] = False,  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501  # noqa: E501
     auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
+    headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
+    mobile: Annotated[bool, typer.Option("--mobile", help="Emulate mobile device (iPhone 14 Pro viewport)")] = False,
+    only_main_content: Annotated[bool, typer.Option("--only-main-content", help="Keep main content only")] = False,
+    include_tags: Annotated[str | None, typer.Option("--include-tags", help="CSS selectors to keep")] = None,
+    exclude_tags: Annotated[str | None, typer.Option("--exclude-tags", help="CSS selectors to remove")] = None,
+    diff: Annotated[bool, typer.Option("--diff", help="Show diff against cached version")] = False,
 ):
     """Scrape one or more URLs. Default output is markdown.
 
@@ -508,8 +591,10 @@ def scrape(
         flarecrawl scrape https://example.com --format html --json
         flarecrawl scrape https://a.com https://b.com --json
         flarecrawl scrape --batch urls.txt --workers 5
-        flarecrawl scrape --input urls.txt --json
-        flarecrawl scrape https://protected.example.com --auth admin:secret
+        flarecrawl scrape --only-main-content --json
+        flarecrawl scrape --exclude-tags "nav,footer" --json
+        flarecrawl scrape --format images --json
+        flarecrawl scrape --format schema --json
     """
     # Validate --batch and --input are not both provided
     if batch and input_file:
@@ -517,6 +602,17 @@ def scrape(
             "Cannot use both --batch and --input. Use --batch (preferred).",
             "VALIDATION_ERROR", EXIT_VALIDATION, as_json=json_output,
         )
+
+    # Validate --include-tags and --exclude-tags are not both provided
+    if include_tags and exclude_tags:
+        _error(
+            "Cannot use both --include-tags and --exclude-tags.",
+            "VALIDATION_ERROR", EXIT_VALIDATION, as_json=json_output,
+        )
+
+    # Parse tag lists
+    _include = [s.strip() for s in include_tags.split(",")] if include_tags else None
+    _exclude = [s.strip() for s in exclude_tags.split(",")] if exclude_tags else None
 
     # Resolve batch file (--batch takes precedence, --input is backward compat)
     batch_file = batch or input_file
@@ -530,6 +626,12 @@ def scrape(
     client = _get_client(json_output or is_batch_mode, cache_ttl=cache_ttl)
     raw_body = _parse_body(body, json_output or is_batch_mode)
     auth_dict = _parse_auth(auth, json_output or is_batch_mode)
+    custom_headers = _parse_headers(headers, json_output or is_batch_mode)
+    if custom_headers:
+        if auth_dict is None:
+            auth_dict = {}
+        existing = auth_dict.get("extra_headers", {})
+        auth_dict["extra_headers"] = {**custom_headers, **existing}
 
     # Load URLs
     all_urls = list(urls or [])
@@ -561,7 +663,8 @@ def scrape(
             return await asyncio.to_thread(
                 _scrape_single, client, url, format, wait_for,
                 screenshot, full_page_screenshot, raw_body, timeout,
-                wait_until, auth_dict,
+                wait_until, auth_dict, mobile,
+                only_main_content, _include, _exclude,
             )
 
         def _on_progress(completed: int, total: int, errors: int):
@@ -596,6 +699,8 @@ def scrape(
             kwargs["timeout"] = wait_for
         if timeout:
             kwargs["timeout"] = timeout
+        if mobile:
+            kwargs.update(MOBILE_PRESET)
         if auth_dict:
             kwargs.update(auth_dict)
         try:
@@ -618,7 +723,8 @@ def scrape(
                 pool.submit(
                     _scrape_single, client, url, format, wait_for,
                     screenshot, full_page_screenshot, raw_body, timeout,
-                    wait_until, auth_dict,
+                    wait_until, auth_dict, mobile,
+                    only_main_content, _include, _exclude,
                 ): url
                 for url in all_urls
             }
@@ -642,7 +748,11 @@ def scrape(
             result = _scrape_single(client, url, format, wait_for, screenshot,
                                     full_page_screenshot, raw_body, timeout,
                                     wait_until=wait_until,
-                                    auth_kwargs=auth_dict)
+                                    auth_kwargs=auth_dict,
+                                    mobile=mobile,
+                                    only_main_content=only_main_content,
+                                    include_tags=_include,
+                                    exclude_tags=_exclude)
             if timing:
                 console.print(f"[dim]{url} — {result['elapsed']:.1f}s[/dim]")
             results.append(result)
@@ -653,6 +763,33 @@ def scrape(
     # Show browser time if timing enabled
     if timing and client.browser_ms_used:
         console.print(f"[dim]Browser time: {client.browser_ms_used}ms[/dim]")
+
+    # Diff mode: compare against cached version
+    if diff and results:
+        import difflib
+
+        from . import cache as _cache
+        for r in results:
+            content_str = r.get("content", "")
+            if not isinstance(content_str, str):
+                content_str = json.dumps(content_str, indent=2)
+            endpoint = "markdown" if format == "markdown" else "content"
+            cache_body = {"url": r.get("url", ""), "format": format}
+            cached = _cache.get(endpoint + ":diff", cache_body, ttl=86400 * 30)
+            if cached:
+                old_lines = cached.splitlines(keepends=True)
+                new_lines = content_str.splitlines(keepends=True)
+                diff_text = "".join(difflib.unified_diff(
+                    old_lines, new_lines,
+                    fromfile="cached", tofile="current", lineterm="",
+                ))
+                added = sum(1 for ln in diff_text.splitlines() if ln.startswith("+") and not ln.startswith("+++"))
+                removed = sum(1 for ln in diff_text.splitlines() if ln.startswith("-") and not ln.startswith("---"))
+                r["diff"] = {"added": added, "removed": removed, "diff": diff_text}
+            else:
+                r["diff"] = {"added": 0, "removed": 0, "diff": "(no cached version to compare)"}
+            # Store current version for next diff
+            _cache.put(endpoint + ":diff", cache_body, content_str)
 
     # Output
     if json_output:
@@ -710,6 +847,7 @@ def crawl(
     status_check: Annotated[bool, typer.Option("--status", help="Check status of existing job")] = False,
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
     auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
+    headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
 ):
     """Crawl a website. Returns JSON by default (like firecrawl).
 
@@ -742,6 +880,12 @@ def crawl(
     _validate_url(url_or_job_id, json_output)
     raw_body = _parse_body(body, json_output)
     auth_dict = _parse_auth(auth, json_output)
+    custom_headers = _parse_headers(headers, json_output)
+    if custom_headers:
+        if auth_dict is None:
+            auth_dict = {}
+        existing = auth_dict.get("extra_headers", {})
+        auth_dict["extra_headers"] = {**custom_headers, **existing}
 
     if raw_body:
         raw_body.setdefault("url", url_or_job_id)
@@ -865,6 +1009,7 @@ def map_urls(
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
     auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
+    headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
 ):
     """Discover all URLs on a website.
 
@@ -882,6 +1027,12 @@ def map_urls(
     _validate_url(url, json_output)
     raw_body = _parse_body(body, json_output)
     auth_dict = _parse_auth(auth, json_output)
+    custom_headers = _parse_headers(headers, json_output)
+    if custom_headers:
+        if auth_dict is None:
+            auth_dict = {}
+        existing = auth_dict.get("extra_headers", {})
+        auth_dict["extra_headers"] = {**custom_headers, **existing}
 
     try:
         if raw_body:
@@ -934,6 +1085,7 @@ def download(
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
+    headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
 ):
     """Download a site into .flarecrawl/ as files.
 
@@ -947,6 +1099,12 @@ def download(
     client = _get_client(json_output)
     _validate_url(url, json_output)
     auth_dict = _parse_auth(auth, json_output)
+    custom_headers = _parse_headers(headers, json_output)
+    if custom_headers:
+        if auth_dict is None:
+            auth_dict = {}
+        existing = auth_dict.get("extra_headers", {})
+        auth_dict["extra_headers"] = {**custom_headers, **existing}
 
     parsed = urlparse(url)
     site_name = parsed.netloc.replace(":", "-")
@@ -1046,6 +1204,7 @@ def extract(
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
     auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
+    headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
 ):
     """AI-powered structured data extraction from web pages.
 
@@ -1063,6 +1222,12 @@ def extract(
     client = _get_client(json_output or is_batch_mode, cache_ttl=cache_ttl)
     raw_body = _parse_body(body, json_output or is_batch_mode)
     auth_dict = _parse_auth(auth, json_output or is_batch_mode)
+    custom_headers = _parse_headers(headers, json_output or is_batch_mode)
+    if custom_headers:
+        if auth_dict is None:
+            auth_dict = {}
+        existing = auth_dict.get("extra_headers", {})
+        auth_dict["extra_headers"] = {**custom_headers, **existing}
 
     # Parse URLs from --urls flag
     url_list = []
@@ -1187,6 +1352,8 @@ def screenshot(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON (base64)")] = False,
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
     auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
+    headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
+    mobile: Annotated[bool, typer.Option("--mobile", help="Emulate mobile device (iPhone 14 Pro viewport)")] = False,
 ):
     """Capture a screenshot of a web page.
 
@@ -1200,6 +1367,12 @@ def screenshot(
     _validate_url(url, json_output)
     raw_body = _parse_body(body, json_output)
     auth_dict = _parse_auth(auth, json_output)
+    custom_headers = _parse_headers(headers, json_output)
+    if custom_headers:
+        if auth_dict is None:
+            auth_dict = {}
+        existing = auth_dict.get("extra_headers", {})
+        auth_dict["extra_headers"] = {**custom_headers, **existing}
 
     try:
         if raw_body:
@@ -1221,6 +1394,8 @@ def screenshot(
                 kwargs["wait_for"] = wait_for
             if timeout:
                 kwargs["timeout"] = timeout
+            if mobile:
+                kwargs.update(MOBILE_PRESET)
             if auth_dict:
                 kwargs.update(auth_dict)
             data = client.take_screenshot(url, **kwargs)
@@ -1259,6 +1434,8 @@ def pdf(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON (base64)")] = False,
     body: Annotated[str | None, typer.Option("--body", help="Raw JSON body")] = None,
     auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
+    headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
+    mobile: Annotated[bool, typer.Option("--mobile", help="Emulate mobile device (iPhone 14 Pro viewport)")] = False,
 ):
     """Render a web page as PDF.
 
@@ -1271,6 +1448,12 @@ def pdf(
     _validate_url(url, json_output)
     raw_body = _parse_body(body, json_output)
     auth_dict = _parse_auth(auth, json_output)
+    custom_headers = _parse_headers(headers, json_output)
+    if custom_headers:
+        if auth_dict is None:
+            auth_dict = {}
+        existing = auth_dict.get("extra_headers", {})
+        auth_dict["extra_headers"] = {**custom_headers, **existing}
 
     try:
         if raw_body:
@@ -1286,6 +1469,8 @@ def pdf(
                 kwargs["print_background"] = True
             if timeout:
                 kwargs["timeout"] = timeout
+            if mobile:
+                kwargs.update(MOBILE_PRESET)
             if auth_dict:
                 kwargs.update(auth_dict)
             data = client.render_pdf(url, **kwargs)
@@ -1362,6 +1547,7 @@ def favicon(
     timeout: Annotated[int | None, typer.Option("--timeout", help="Timeout in ms")] = None,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
     auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
+    headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
 ):
     """Extract favicon URL from a web page.
 
@@ -1376,6 +1562,12 @@ def favicon(
     client = _get_client(json_output, cache_ttl=cache_ttl)
     _validate_url(url, json_output)
     auth_dict = _parse_auth(auth, json_output)
+    custom_headers = _parse_headers(headers, json_output)
+    if custom_headers:
+        if auth_dict is None:
+            auth_dict = {}
+        existing = auth_dict.get("extra_headers", {})
+        auth_dict["extra_headers"] = {**custom_headers, **existing}
 
     try:
         kwargs = {}
@@ -1419,6 +1611,80 @@ def favicon(
         else:
             best = favicons[0]
             _output_text(best["url"])
+
+
+# ------------------------------------------------------------------
+# schema — structured data extraction
+# ------------------------------------------------------------------
+
+
+@app.command()
+def schema(
+    url: Annotated[str, typer.Argument(help="URL to extract structured data from")],
+    type_filter: Annotated[str, typer.Option("--type", help="Filter: ld-json, opengraph, twitter, all")] = "all",
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    timeout: Annotated[int | None, typer.Option("--timeout", help="Timeout in ms")] = None,
+    no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass response cache")] = False,
+    auth: Annotated[str | None, typer.Option("--auth", help="HTTP Basic Auth (user:password)")] = None,
+    headers: Annotated[list[str] | None, typer.Option("--headers", help="Custom HTTP headers")] = None,
+):
+    """Extract structured data (LD+JSON, OpenGraph, Twitter Cards) from a page.
+
+    Parses <script type="application/ld+json">, <meta property="og:*">,
+    and <meta name="twitter:*"> tags from the rendered HTML.
+
+    Example:
+        flarecrawl schema https://example.com --json
+        flarecrawl schema https://example.com --type ld-json --json
+        flarecrawl schema https://example.com --type opengraph
+    """
+    from .extract import extract_structured_data
+
+    cache_ttl = 0 if no_cache else DEFAULT_CACHE_TTL
+    client = _get_client(json_output, cache_ttl=cache_ttl)
+    _validate_url(url, json_output)
+    auth_dict = _parse_auth(auth, json_output)
+    custom_headers = _parse_headers(headers, json_output)
+    if custom_headers:
+        if auth_dict is None:
+            auth_dict = {}
+        existing = auth_dict.get("extra_headers", {})
+        auth_dict["extra_headers"] = {**custom_headers, **existing}
+
+    try:
+        kwargs = {}
+        if timeout:
+            kwargs["timeout"] = timeout
+        kwargs["reject_resources"] = ["image", "media", "font", "stylesheet"]
+        if auth_dict:
+            kwargs.update(auth_dict)
+        html = client.get_content(url, **kwargs)
+    except FlareCrawlError as e:
+        _handle_api_error(e, json_output)
+        return
+
+    data = extract_structured_data(html)
+
+    # Apply type filter
+    if type_filter != "all":
+        filter_map = {
+            "ld-json": "ld_json",
+            "opengraph": "opengraph",
+            "twitter": "twitter_card",
+        }
+        key = filter_map.get(type_filter)
+        if key:
+            data = {key: data[key]}
+        else:
+            _error(
+                f"Invalid --type: {type_filter}. Use: ld-json, opengraph, twitter, all",
+                "VALIDATION_ERROR", EXIT_VALIDATION, as_json=json_output,
+            )
+
+    if json_output:
+        _output_json({"data": data, "meta": {"url": url, "type": type_filter}})
+    else:
+        _output_json(data)
 
 
 # ------------------------------------------------------------------

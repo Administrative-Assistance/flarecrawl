@@ -25,6 +25,19 @@ class FlareCrawlError(Exception):
         self.status_code = status_code
 
 
+# iPhone 14 Pro mobile device preset
+MOBILE_PRESET = {
+    "width": 390,
+    "height": 844,
+    "device_scale_factor": 3,
+    "user_agent": (
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+        "Version/17.0 Mobile/15E148 Safari/604.1"
+    ),
+}
+
+
 class Client:
     """Cloudflare Browser Rendering REST API client.
 

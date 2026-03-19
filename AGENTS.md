@@ -31,6 +31,14 @@
 | Scrape (custom wait) | `flarecrawl scrape URL --wait-until networkidle2` |
 | Scrape with HTTP Basic Auth | `flarecrawl scrape URL --auth user:pass` |
 | Crawl with HTTP Basic Auth | `flarecrawl crawl URL --wait --limit N --auth user:pass` |
+| Scrape main content only | `flarecrawl scrape URL --only-main-content` |
+| Scrape excluding nav/footer | `flarecrawl scrape URL --exclude-tags "nav,footer"` |
+| Scrape with custom headers | `flarecrawl scrape URL --headers "Accept-Language: fr"` |
+| Scrape mobile viewport | `flarecrawl scrape URL --mobile` |
+| Extract images | `flarecrawl scrape URL --format images --json` |
+| Extract structured data | `flarecrawl schema URL --json` |
+| AI summary | `flarecrawl scrape URL --format summary --json` |
+| Diff against cache | `flarecrawl scrape URL --diff --json` |
 | Check usage | `flarecrawl usage --json` |
 | Auth status | `flarecrawl auth status --json` |
 | Cache status | `flarecrawl cache status --json` |

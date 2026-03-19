@@ -27,7 +27,7 @@ class TestHelp:
     def test_version(self):
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "flarecrawl 0.4.0" in result.output
+        assert "flarecrawl 0.5.0" in result.output
 
     def test_status_flag(self):
         result = runner.invoke(app, ["--status"])
@@ -91,10 +91,10 @@ class TestHelp:
         assert "--all" in result.output
         assert "--json" in result.output
 
-    def test_scrape_no_only_main_content(self):
-        """--only-main-content was removed (CF /markdown has no such option)."""
+    def test_scrape_has_only_main_content(self):
+        """--only-main-content extracts main article content via BeautifulSoup."""
         result = runner.invoke(app, ["scrape", "--help"])
-        assert "--only-main-content" not in result.output
+        assert "--only-main-content" in result.output
 
     def test_scrape_has_js_flag(self):
         result = runner.invoke(app, ["scrape", "--help"])
@@ -393,3 +393,104 @@ class TestAuthBodyBuilder:
         )
         assert body["authenticate"] == {"username": "admin", "password": "secret"}
         assert body["setExtraHTTPHeaders"] == {"Authorization": "Basic YWRtaW46c2VjcmV0"}
+
+
+class TestParseHeaders:
+    """Test custom HTTP headers parsing."""
+
+    def test_parse_key_value(self):
+        from flarecrawl.cli import _parse_headers
+        result = _parse_headers(["Accept-Language: en-US"])
+        assert result == {"Accept-Language": "en-US"}
+
+    def test_parse_multiple(self):
+        from flarecrawl.cli import _parse_headers
+        result = _parse_headers(["X-Custom: foo", "Accept: text/html"])
+        assert result == {"X-Custom": "foo", "Accept": "text/html"}
+
+    def test_parse_json(self):
+        from flarecrawl.cli import _parse_headers
+        result = _parse_headers(['{"X-Api-Key": "abc123", "Accept": "application/json"}'])
+        assert result == {"X-Api-Key": "abc123", "Accept": "application/json"}
+
+    def test_parse_none(self):
+        from flarecrawl.cli import _parse_headers
+        assert _parse_headers(None) is None
+
+    def test_parse_empty_list(self):
+        from flarecrawl.cli import _parse_headers
+        assert _parse_headers([]) is None
+
+    def test_invalid_no_colon(self):
+        from flarecrawl.cli import _parse_headers
+        import typer
+        import pytest
+        with pytest.raises(typer.Exit):
+            _parse_headers(["no-colon-here"])
+
+    def test_invalid_json(self):
+        from flarecrawl.cli import _parse_headers
+        import typer
+        import pytest
+        with pytest.raises(typer.Exit):
+            _parse_headers(["{bad json}"])
+
+    def test_headers_flag_in_all_commands(self):
+        commands = ["scrape", "crawl", "map", "download", "extract",
+                    "screenshot", "pdf", "favicon"]
+        for cmd in commands:
+            result = runner.invoke(app, [cmd, "--help"])
+            assert "--headers" in result.output, f"--headers missing from {cmd} help"
+
+
+class TestNewScrapeFlags:
+    """Test new v0.5.0 scrape flags."""
+
+    def test_scrape_has_include_tags(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--include-tags" in result.output
+
+    def test_scrape_has_exclude_tags(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--exclude-tags" in result.output
+
+    def test_scrape_has_diff(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--diff" in result.output
+
+    def test_include_exclude_mutually_exclusive(self):
+        """--include-tags and --exclude-tags cannot be used together."""
+        result = runner.invoke(app, [
+            "scrape", "https://example.com",
+            "--include-tags", "main",
+            "--exclude-tags", "nav",
+            "--json",
+        ])
+        assert result.exit_code == 4
+        assert "Cannot use both" in result.output or "Cannot use both" in (result.stderr or "")
+
+    def test_scrape_format_images_in_help(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "images" in result.output
+
+    def test_scrape_format_summary_in_help(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "summary" in result.output
+
+    def test_scrape_format_schema_in_help(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "schema" in result.output
+
+
+class TestSchemaCommand:
+    """Test the schema command."""
+
+    def test_schema_help(self):
+        result = runner.invoke(app, ["schema", "--help"])
+        assert result.exit_code == 0
+        assert "--type" in result.output
+        assert "ld-json" in result.output
+
+    def test_schema_requires_auth(self, no_credentials):
+        result = runner.invoke(app, ["schema", "https://example.com", "--json"])
+        assert result.exit_code == 2
