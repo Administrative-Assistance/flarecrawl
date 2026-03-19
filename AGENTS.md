@@ -416,6 +416,22 @@ A typical page scrape uses 100-200ms of browser time. A 30-page crawl uses ~50s 
 | `FLARECRAWL_MAX_WORKERS` | 10 | Max parallel workers for batch mode |
 | `FLARECRAWL_TIMEOUT` | 120 | Request timeout in seconds |
 
+## Testing
+
+```bash
+# Unit tests (158 tests, no API calls)
+pytest tests/ -v
+
+# Feature test corpus (80 live tests, requires auth)
+python tests/corpus.py
+
+# Quick corpus (10 tests, 1 per feature)
+python tests/corpus.py --quick
+
+# Test specific feature/site
+python tests/corpus.py --feature schema --site news-heavy
+```
+
 ## Release Process
 
 When shipping a new version:

@@ -13,6 +13,7 @@ CLI that wraps Cloudflare's [Browser Rendering REST API](https://developers.clou
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **v0.5.1** | 2026-03-19 | Feature test corpus (80 live tests across 8 sites), 158 unit tests, all green |
 | **v0.5.0** | 2026-03-19 | `--only-main-content`, `--include-tags`/`--exclude-tags`, `--mobile`, `--headers`, `--diff`, formats: `images`/`summary`/`schema`, new `schema` command |
 | **v0.4.0** | 2026-03-19 | `--auth user:pass` flag on all commands for HTTP Basic Auth protected sites |
 | **v0.3.0** | 2026-03-19 | Batch mode, response caching, connection pooling, HTTP/2, env-var config, 100 tests |
@@ -141,6 +142,56 @@ flarecrawl scrape https://intranet.example.com --auth admin:secret
 flarecrawl crawl https://intranet.example.com --wait --limit 50 --auth admin:secret
 flarecrawl download https://intranet.example.com --limit 20 --auth user:pass
 flarecrawl screenshot https://intranet.example.com --auth user:pass -o page.png
+```
+
+### Content filtering
+
+```bash
+# Strip nav/header/footer, keep main article content
+flarecrawl scrape https://example.com --only-main-content
+
+# Keep only specific CSS selectors
+flarecrawl scrape https://example.com --include-tags "article,.post"
+
+# Remove specific elements
+flarecrawl scrape https://example.com --exclude-tags "nav,footer,.sidebar"
+```
+
+### Custom headers & mobile
+
+```bash
+# Custom HTTP headers
+flarecrawl scrape https://example.com --headers "Accept-Language: fr"
+flarecrawl scrape https://example.com --headers '{"X-Api-Key": "abc123"}'
+
+# Mobile device emulation (iPhone 14 Pro viewport)
+flarecrawl scrape https://example.com --mobile
+flarecrawl screenshot https://example.com --mobile -o mobile.png
+```
+
+### Images, summaries & structured data
+
+```bash
+# Extract all image URLs from a page
+flarecrawl scrape https://example.com --format images --json
+
+# AI-powered content summary
+flarecrawl scrape https://example.com --format summary --json
+
+# Extract LD+JSON, OpenGraph, Twitter Cards
+flarecrawl scrape https://example.com --format schema --json
+
+# Dedicated schema command with type filtering
+flarecrawl schema https://example.com --json
+flarecrawl schema https://example.com --type ld-json --json
+flarecrawl schema https://example.com --type opengraph --json
+```
+
+### Change tracking
+
+```bash
+# Compare current content against cached version
+flarecrawl scrape https://example.com --diff --json
 ```
 
 ### crawl — Crawl a website
@@ -365,9 +416,10 @@ Flarecrawl follows the same command structure as the `firecrawl` CLI:
 - **No `search` command** — Cloudflare doesn't have a web search API
 - **`extract` instead of `agent`** — same concept, different name to avoid confusion
 - **`favicon` command** — bonus: extract favicon/apple-touch-icon URLs from pages
+- **`schema` command** — bonus: extract LD+JSON, OpenGraph, Twitter Cards
 - **PDF command** — bonus: Cloudflare supports PDF rendering, Firecrawl doesn't
 - **Output directory** — `.flarecrawl/` instead of `.firecrawl/`
-- **No `--only-main-content`** — CF's `/markdown` endpoint returns full page content; use `extract` for targeted extraction
+- **`--only-main-content`** — client-side via BeautifulSoup (Firecrawl uses server-side extraction)
 
 ## Output Format
 
@@ -512,13 +564,16 @@ flarecrawl/
 │   ├── cache.py                # File-based response cache
 │   ├── cli.py                  # Typer CLI (all commands)
 │   ├── client.py               # CF Browser Rendering API client (httpx pooling, HTTP/2)
-│   └── config.py               # Credentials, usage tracking, env-var config
+│   ├── config.py               # Credentials, usage tracking, env-var config
+│   └── extract.py              # HTML extraction (main content, images, schema, tags)
 └── tests/
     ├── conftest.py             # Test fixtures
+    ├── corpus.py               # Feature test corpus (80 live tests x 8 sites)
     ├── test_batch.py           # Batch module tests
     ├── test_cache.py           # Cache module tests
     ├── test_cli.py             # CLI tests
-    └── test_client.py          # Client tests
+    ├── test_client.py          # Client tests
+    └── test_extract.py         # Extract module tests
 ```
 
 ## Development
