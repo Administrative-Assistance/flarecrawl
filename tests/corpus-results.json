@@ -1,0 +1,802 @@
+[
+  {
+    "feature": "scrape-default",
+    "site": "minimal",
+    "url": "https://example.com",
+    "passed": true,
+    "message": "ok (167 chars)",
+    "elapsed": 2.161592483520508,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "scrape-default",
+    "site": "news-heavy",
+    "url": "https://www.bbc.com",
+    "passed": true,
+    "message": "ok (41483 chars)",
+    "elapsed": 4.05887508392334,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "scrape-default",
+    "site": "docs",
+    "url": "https://docs.python.org/3/library/json.html",
+    "passed": true,
+    "message": "ok (37334 chars)",
+    "elapsed": 2.4856934547424316,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "scrape-default",
+    "site": "wiki",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "passed": true,
+    "message": "ok (71353 chars)",
+    "elapsed": 2.9152941703796387,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "scrape-default",
+    "site": "spa-heavy",
+    "url": "https://github.com/trending",
+    "passed": true,
+    "message": "ok (86100 chars)",
+    "elapsed": 3.1266932487487793,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "scrape-default",
+    "site": "spa",
+    "url": "https://react.dev",
+    "passed": true,
+    "message": "ok (17588 chars)",
+    "elapsed": 2.877675771713257,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "scrape-default",
+    "site": "api-docs",
+    "url": "https://httpbin.org",
+    "passed": true,
+    "message": "ok (493 chars)",
+    "elapsed": 5.427801609039307,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "scrape-default",
+    "site": "blog",
+    "url": "https://blog.cloudflare.com/workers-ai/",
+    "passed": true,
+    "message": "ok (30953 chars)",
+    "elapsed": 4.572748899459839,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "only-main-content",
+    "site": "minimal",
+    "url": "https://example.com",
+    "passed": true,
+    "message": "ok (167 chars)",
+    "elapsed": 2.7652618885040283,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "only-main-content",
+    "site": "news-heavy",
+    "url": "https://www.bbc.com",
+    "passed": true,
+    "message": "ok (18201 chars)",
+    "elapsed": 6.2750067710876465,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "only-main-content",
+    "site": "docs",
+    "url": "https://docs.python.org/3/library/json.html",
+    "passed": true,
+    "message": "ok (27383 chars)",
+    "elapsed": 4.152246713638306,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "only-main-content",
+    "site": "wiki",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "passed": true,
+    "message": "ok (36654 chars)",
+    "elapsed": 3.727753162384033,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "only-main-content",
+    "site": "spa-heavy",
+    "url": "https://github.com/trending",
+    "passed": true,
+    "message": "ok (45603 chars)",
+    "elapsed": 5.241960763931274,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "only-main-content",
+    "site": "spa",
+    "url": "https://react.dev",
+    "passed": true,
+    "message": "ok (13831 chars)",
+    "elapsed": 3.568910598754883,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "only-main-content",
+    "site": "api-docs",
+    "url": "https://httpbin.org",
+    "passed": true,
+    "message": "ok (441 chars)",
+    "elapsed": 9.075908899307251,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "only-main-content",
+    "site": "blog",
+    "url": "https://blog.cloudflare.com/workers-ai/",
+    "passed": true,
+    "message": "ok (18431 chars)",
+    "elapsed": 5.470237731933594,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "exclude-tags",
+    "site": "minimal",
+    "url": "https://example.com",
+    "passed": true,
+    "message": "ok (167 chars)",
+    "elapsed": 4.038195610046387,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "exclude-tags",
+    "site": "news-heavy",
+    "url": "https://www.bbc.com",
+    "passed": true,
+    "message": "ok (18469 chars)",
+    "elapsed": 6.465377569198608,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "exclude-tags",
+    "site": "docs",
+    "url": "https://docs.python.org/3/library/json.html",
+    "passed": true,
+    "message": "ok (30446 chars)",
+    "elapsed": 3.948960542678833,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "exclude-tags",
+    "site": "wiki",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "passed": true,
+    "message": "ok (36762 chars)",
+    "elapsed": 3.8408358097076416,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "exclude-tags",
+    "site": "spa-heavy",
+    "url": "https://github.com/trending",
+    "passed": true,
+    "message": "ok (45940 chars)",
+    "elapsed": 6.472815036773682,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "exclude-tags",
+    "site": "spa",
+    "url": "https://react.dev",
+    "passed": true,
+    "message": "ok (13836 chars)",
+    "elapsed": 4.624067306518555,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "exclude-tags",
+    "site": "api-docs",
+    "url": "https://httpbin.org",
+    "passed": true,
+    "message": "ok (441 chars)",
+    "elapsed": 10.150766372680664,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "exclude-tags",
+    "site": "blog",
+    "url": "https://blog.cloudflare.com/workers-ai/",
+    "passed": true,
+    "message": "ok (20716 chars)",
+    "elapsed": 5.849427700042725,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-images",
+    "site": "minimal",
+    "url": "https://example.com",
+    "passed": true,
+    "message": "ok (0 images)",
+    "elapsed": 2.2883474826812744,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-images",
+    "site": "news-heavy",
+    "url": "https://www.bbc.com",
+    "passed": true,
+    "message": "ok (60 images)",
+    "elapsed": 3.4309072494506836,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-images",
+    "site": "docs",
+    "url": "https://docs.python.org/3/library/json.html",
+    "passed": true,
+    "message": "ok (2 images)",
+    "elapsed": 2.91284441947937,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-images",
+    "site": "wiki",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "passed": true,
+    "message": "ok (12 images)",
+    "elapsed": 2.4311892986297607,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-images",
+    "site": "spa-heavy",
+    "url": "https://github.com/trending",
+    "passed": true,
+    "message": "ok (31 images)",
+    "elapsed": 4.200939416885376,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-images",
+    "site": "spa",
+    "url": "https://react.dev",
+    "passed": true,
+    "message": "ok (36 images)",
+    "elapsed": 2.6747353076934814,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-images",
+    "site": "api-docs",
+    "url": "https://httpbin.org",
+    "passed": true,
+    "message": "ok (0 images)",
+    "elapsed": 4.495309829711914,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-images",
+    "site": "blog",
+    "url": "https://blog.cloudflare.com/workers-ai/",
+    "passed": true,
+    "message": "ok (19 images)",
+    "elapsed": 5.7447686195373535,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-schema",
+    "site": "minimal",
+    "url": "https://example.com",
+    "passed": true,
+    "message": "ok (ld:0 og:0 tw:0)",
+    "elapsed": 2.0555419921875,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-schema",
+    "site": "news-heavy",
+    "url": "https://www.bbc.com",
+    "passed": true,
+    "message": "ok (ld:1 og:2 tw:2)",
+    "elapsed": 4.528021574020386,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-schema",
+    "site": "docs",
+    "url": "https://docs.python.org/3/library/json.html",
+    "passed": true,
+    "message": "ok (ld:0 og:9 tw:1)",
+    "elapsed": 2.841670036315918,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-schema",
+    "site": "wiki",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "passed": true,
+    "message": "ok (ld:1 og:2 tw:0)",
+    "elapsed": 2.5740506649017334,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-schema",
+    "site": "spa-heavy",
+    "url": "https://github.com/trending",
+    "passed": true,
+    "message": "ok (ld:0 og:8 tw:0)",
+    "elapsed": 3.9438586235046387,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-schema",
+    "site": "spa",
+    "url": "https://react.dev",
+    "passed": true,
+    "message": "ok (ld:0 og:5 tw:6)",
+    "elapsed": 2.9404356479644775,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-schema",
+    "site": "api-docs",
+    "url": "https://httpbin.org",
+    "passed": true,
+    "message": "ok (ld:0 og:0 tw:0)",
+    "elapsed": 5.071313858032227,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-schema",
+    "site": "blog",
+    "url": "https://blog.cloudflare.com/workers-ai/",
+    "passed": true,
+    "message": "ok (ld:0 og:8 tw:11)",
+    "elapsed": 2.5062084197998047,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "schema-command",
+    "site": "minimal",
+    "url": "https://example.com",
+    "passed": true,
+    "message": "ok (ld:0 og:0 tw:0)",
+    "elapsed": 2.1529269218444824,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "schema-command",
+    "site": "news-heavy",
+    "url": "https://www.bbc.com",
+    "passed": true,
+    "message": "ok (ld:1 og:2 tw:2)",
+    "elapsed": 3.2111399173736572,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "schema-command",
+    "site": "docs",
+    "url": "https://docs.python.org/3/library/json.html",
+    "passed": true,
+    "message": "ok (ld:0 og:9 tw:1)",
+    "elapsed": 2.25345778465271,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "schema-command",
+    "site": "wiki",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "passed": true,
+    "message": "ok (ld:1 og:2 tw:0)",
+    "elapsed": 3.477186918258667,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "schema-command",
+    "site": "spa-heavy",
+    "url": "https://github.com/trending",
+    "passed": true,
+    "message": "ok (ld:0 og:8 tw:0)",
+    "elapsed": 4.021741628646851,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "schema-command",
+    "site": "spa",
+    "url": "https://react.dev",
+    "passed": true,
+    "message": "ok (ld:0 og:5 tw:6)",
+    "elapsed": 2.9092142581939697,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "schema-command",
+    "site": "api-docs",
+    "url": "https://httpbin.org",
+    "passed": true,
+    "message": "ok (ld:0 og:0 tw:0)",
+    "elapsed": 4.465447664260864,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "schema-command",
+    "site": "blog",
+    "url": "https://blog.cloudflare.com/workers-ai/",
+    "passed": true,
+    "message": "ok (ld:0 og:8 tw:11)",
+    "elapsed": 3.7549500465393066,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "mobile",
+    "site": "minimal",
+    "url": "https://example.com",
+    "passed": true,
+    "message": "ok (167 chars)",
+    "elapsed": 1.8653209209442139,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "mobile",
+    "site": "news-heavy",
+    "url": "https://www.bbc.com",
+    "passed": true,
+    "message": "ok (41587 chars)",
+    "elapsed": 3.5876615047454834,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "mobile",
+    "site": "docs",
+    "url": "https://docs.python.org/3/library/json.html",
+    "passed": true,
+    "message": "ok (37334 chars)",
+    "elapsed": 2.668111562728882,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "mobile",
+    "site": "wiki",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "passed": true,
+    "message": "ok (61939 chars)",
+    "elapsed": 3.9095144271850586,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "mobile",
+    "site": "spa-heavy",
+    "url": "https://github.com/trending",
+    "passed": true,
+    "message": "ok (86100 chars)",
+    "elapsed": 4.392363786697388,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "mobile",
+    "site": "spa",
+    "url": "https://react.dev",
+    "passed": true,
+    "message": "ok (17588 chars)",
+    "elapsed": 2.358617067337036,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "mobile",
+    "site": "api-docs",
+    "url": "https://httpbin.org",
+    "passed": true,
+    "message": "ok (493 chars)",
+    "elapsed": 4.625500202178955,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "mobile",
+    "site": "blog",
+    "url": "https://blog.cloudflare.com/workers-ai/",
+    "passed": true,
+    "message": "ok (30953 chars)",
+    "elapsed": 3.8532512187957764,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "headers",
+    "site": "minimal",
+    "url": "https://example.com",
+    "passed": true,
+    "message": "ok (167 chars)",
+    "elapsed": 2.334202766418457,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "headers",
+    "site": "news-heavy",
+    "url": "https://www.bbc.com",
+    "passed": true,
+    "message": "ok (41587 chars)",
+    "elapsed": 3.6766233444213867,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "headers",
+    "site": "docs",
+    "url": "https://docs.python.org/3/library/json.html",
+    "passed": true,
+    "message": "ok (37334 chars)",
+    "elapsed": 2.523409128189087,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "headers",
+    "site": "wiki",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "passed": true,
+    "message": "ok (71353 chars)",
+    "elapsed": 2.7028980255126953,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "headers",
+    "site": "spa-heavy",
+    "url": "https://github.com/trending",
+    "passed": true,
+    "message": "ok (86100 chars)",
+    "elapsed": 3.5813241004943848,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "headers",
+    "site": "spa",
+    "url": "https://react.dev",
+    "passed": true,
+    "message": "ok (17588 chars)",
+    "elapsed": 3.422667980194092,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "headers",
+    "site": "api-docs",
+    "url": "https://httpbin.org",
+    "passed": true,
+    "message": "ok (493 chars)",
+    "elapsed": 5.289566278457642,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "headers",
+    "site": "blog",
+    "url": "https://blog.cloudflare.com/workers-ai/",
+    "passed": true,
+    "message": "ok (30953 chars)",
+    "elapsed": 3.5436043739318848,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-html",
+    "site": "minimal",
+    "url": "https://example.com",
+    "passed": true,
+    "message": "ok (528 chars)",
+    "elapsed": 2.0473077297210693,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-html",
+    "site": "news-heavy",
+    "url": "https://www.bbc.com",
+    "passed": true,
+    "message": "ok (437122 chars)",
+    "elapsed": 3.8285820484161377,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-html",
+    "site": "docs",
+    "url": "https://docs.python.org/3/library/json.html",
+    "passed": true,
+    "message": "ok (117467 chars)",
+    "elapsed": 2.622097969055176,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-html",
+    "site": "wiki",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "passed": true,
+    "message": "ok (165437 chars)",
+    "elapsed": 3.1399686336517334,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-html",
+    "site": "spa-heavy",
+    "url": "https://github.com/trending",
+    "passed": true,
+    "message": "ok (522629 chars)",
+    "elapsed": 4.024373769760132,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-html",
+    "site": "spa",
+    "url": "https://react.dev",
+    "passed": true,
+    "message": "ok (272877 chars)",
+    "elapsed": 2.6572723388671875,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-html",
+    "site": "api-docs",
+    "url": "https://httpbin.org",
+    "passed": true,
+    "message": "ok (9496 chars)",
+    "elapsed": 4.317358732223511,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "format-html",
+    "site": "blog",
+    "url": "https://blog.cloudflare.com/workers-ai/",
+    "passed": true,
+    "message": "ok (405625 chars)",
+    "elapsed": 5.707916259765625,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "diff",
+    "site": "minimal",
+    "url": "https://example.com",
+    "passed": true,
+    "message": "ok (added:0 removed:0)",
+    "elapsed": 2.2714781761169434,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "diff",
+    "site": "news-heavy",
+    "url": "https://www.bbc.com",
+    "passed": true,
+    "message": "ok (added:4 removed:4)",
+    "elapsed": 3.8431570529937744,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "diff",
+    "site": "docs",
+    "url": "https://docs.python.org/3/library/json.html",
+    "passed": true,
+    "message": "ok (added:0 removed:0)",
+    "elapsed": 2.8871681690216064,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "diff",
+    "site": "wiki",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "passed": true,
+    "message": "ok (added:0 removed:0)",
+    "elapsed": 4.844785928726196,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "diff",
+    "site": "spa-heavy",
+    "url": "https://github.com/trending",
+    "passed": true,
+    "message": "ok (added:6 removed:6)",
+    "elapsed": 4.239971876144409,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "diff",
+    "site": "spa",
+    "url": "https://react.dev",
+    "passed": true,
+    "message": "ok (added:0 removed:0)",
+    "elapsed": 2.0306026935577393,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "diff",
+    "site": "api-docs",
+    "url": "https://httpbin.org",
+    "passed": true,
+    "message": "ok (added:0 removed:0)",
+    "elapsed": 5.257920026779175,
+    "exit_code": 0,
+    "error": ""
+  },
+  {
+    "feature": "diff",
+    "site": "blog",
+    "url": "https://blog.cloudflare.com/workers-ai/",
+    "passed": true,
+    "message": "ok (added:0 removed:0)",
+    "elapsed": 4.334739446640015,
+    "exit_code": 0,
+    "error": ""
+  }
+]
