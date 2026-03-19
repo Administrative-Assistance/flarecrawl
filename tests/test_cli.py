@@ -324,17 +324,23 @@ class TestFavicon:
 
 
 class TestParseAuth:
-    """Test HTTP Basic Auth parsing."""
+    """Test HTTP Basic Auth parsing — dual authenticate + setExtraHTTPHeaders."""
 
     def test_parse_auth_valid(self):
+        import base64
         from flarecrawl.cli import _parse_auth
         result = _parse_auth("admin:secret")
-        assert result == {"username": "admin", "password": "secret"}
+        assert result["authenticate"] == {"username": "admin", "password": "secret"}
+        expected_b64 = base64.b64encode(b"admin:secret").decode()
+        assert result["extra_headers"] == {"Authorization": f"Basic {expected_b64}"}
 
     def test_parse_auth_password_with_colon(self):
+        import base64
         from flarecrawl.cli import _parse_auth
         result = _parse_auth("user:pass:with:colons")
-        assert result == {"username": "user", "password": "pass:with:colons"}
+        assert result["authenticate"] == {"username": "user", "password": "pass:with:colons"}
+        expected_b64 = base64.b64encode(b"user:pass:with:colons").decode()
+        assert result["extra_headers"] == {"Authorization": f"Basic {expected_b64}"}
 
     def test_parse_auth_none(self):
         from flarecrawl.cli import _parse_auth
@@ -357,7 +363,17 @@ class TestParseAuth:
 
 
 class TestAuthBodyBuilder:
-    """Test that authenticate flows through _build_body."""
+    """Test that auth flows through _build_body with both mechanisms."""
+
+    def test_extra_headers_in_body(self):
+        from flarecrawl.client import Client
+        headers = {"Authorization": "Basic YWRtaW46c2VjcmV0"}
+        body = Client._build_body(
+            url="https://example.com",
+            extra_headers=headers,
+        )
+        assert body["setExtraHTTPHeaders"] == {"Authorization": "Basic YWRtaW46c2VjcmV0"}
+        assert body["url"] == "https://example.com"
 
     def test_authenticate_in_body(self):
         from flarecrawl.client import Client
@@ -366,4 +382,14 @@ class TestAuthBodyBuilder:
             authenticate={"username": "admin", "password": "secret"},
         )
         assert body["authenticate"] == {"username": "admin", "password": "secret"}
-        assert body["url"] == "https://example.com"
+
+    def test_both_auth_mechanisms(self):
+        """Both authenticate and setExtraHTTPHeaders can coexist."""
+        from flarecrawl.client import Client
+        body = Client._build_body(
+            url="https://example.com",
+            authenticate={"username": "admin", "password": "secret"},
+            extra_headers={"Authorization": "Basic YWRtaW46c2VjcmV0"},
+        )
+        assert body["authenticate"] == {"username": "admin", "password": "secret"}
+        assert body["setExtraHTTPHeaders"] == {"Authorization": "Basic YWRtaW46c2VjcmV0"}

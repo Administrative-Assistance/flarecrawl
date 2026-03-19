@@ -158,7 +158,17 @@ def _parse_body(body_str: str | None, as_json: bool = False) -> dict | None:
 
 
 def _parse_auth(auth_str: str | None, as_json: bool = False) -> dict | None:
-    """Parse --auth user:pass into authenticate dict for CF API."""
+    """Parse --auth user:pass into auth kwargs for CF Browser Rendering API.
+
+    Returns a dict with both 'authenticate' and 'extra_headers' keys.
+    - authenticate: Puppeteer page.authenticate() — responds to 401 challenges
+    - extra_headers: setExtraHTTPHeaders — proactive Authorization on every request
+
+    Both are sent; the API uses whichever works for the target site.
+    CF-proxied targets may reject setExtraHTTPHeaders (422), so authenticate
+    is the primary mechanism. For non-proxied origins behind redirects,
+    setExtraHTTPHeaders survives redirect hops.
+    """
     if not auth_str:
         return None
     if ":" not in auth_str:
@@ -169,7 +179,10 @@ def _parse_auth(auth_str: str | None, as_json: bool = False) -> dict | None:
             as_json=as_json,
         )
     username, password = auth_str.split(":", 1)
-    return {"username": username, "password": password}
+    return {
+        "authenticate": {"username": username, "password": password},
+        "extra_headers": {"Authorization": f"Basic {base64.b64encode(auth_str.encode()).decode()}"},
+    }
 
 
 def _sanitize_filename(url: str) -> str:
@@ -388,7 +401,7 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
                    screenshot: bool, full_page_screenshot: bool,
                    raw_body: dict | None, timeout_ms: int | None,
                    wait_until: str | None = None,
-                   authenticate: dict | None = None) -> dict:
+                   auth_kwargs: dict | None = None) -> dict:
     """Scrape a single URL. Returns result dict. Used for concurrent scraping."""
     start = _time.time()
     kwargs = {}
@@ -398,8 +411,8 @@ def _scrape_single(client: Client, url: str, format: str, wait_for: int | None,
         kwargs["timeout"] = timeout_ms
     if wait_until:
         kwargs["wait_until"] = wait_until
-    if authenticate:
-        kwargs["authenticate"] = authenticate
+    if auth_kwargs:
+        kwargs.update(auth_kwargs)
 
     if raw_body:
         body_copy = {**raw_body, "url": url}
@@ -584,7 +597,7 @@ def scrape(
         if timeout:
             kwargs["timeout"] = timeout
         if auth_dict:
-            kwargs["authenticate"] = auth_dict
+            kwargs.update(auth_dict)
         try:
             binary = client.take_screenshot(url, **kwargs)
         except FlareCrawlError as e:
@@ -629,7 +642,7 @@ def scrape(
             result = _scrape_single(client, url, format, wait_for, screenshot,
                                     full_page_screenshot, raw_body, timeout,
                                     wait_until=wait_until,
-                                    authenticate=auth_dict)
+                                    auth_kwargs=auth_dict)
             if timing:
                 console.print(f"[dim]{url} — {result['elapsed']:.1f}s[/dim]")
             results.append(result)
@@ -759,7 +772,7 @@ def crawl(
         if exclude_paths:
             kwargs["exclude_patterns"] = [p.strip() for p in exclude_paths.split(",")]
         if auth_dict:
-            kwargs["authenticate"] = auth_dict
+            kwargs.update(auth_dict)
 
         try:
             job_id = client.crawl_start(url_or_job_id, **kwargs)
@@ -882,7 +895,7 @@ def map_urls(
             else:
                 kwargs["internal_only"] = True
             if auth_dict:
-                kwargs["authenticate"] = auth_dict
+                kwargs.update(auth_dict)
             links = client.get_links(url, **kwargs)
     except FlareCrawlError as e:
         _handle_api_error(e, json_output)
@@ -959,7 +972,7 @@ def download(
     if exclude_paths:
         kwargs["exclude_patterns"] = [p.strip() for p in exclude_paths.split(",")]
     if auth_dict:
-        kwargs["authenticate"] = auth_dict
+        kwargs.update(auth_dict)
 
     try:
         job_id = client.crawl_start(url, **kwargs)
@@ -1098,7 +1111,7 @@ def extract(
 
         extra_kwargs = {}
         if auth_dict:
-            extra_kwargs["authenticate"] = auth_dict
+            extra_kwargs.update(auth_dict)
 
         async def _extract_one(url: str) -> dict:
             return await asyncio.to_thread(
@@ -1134,7 +1147,7 @@ def extract(
                 result = client.post_raw("json", raw_body)
                 extracted = result.get("result", result)
             else:
-                extra = {"authenticate": auth_dict} if auth_dict else {}
+                extra = auth_dict if auth_dict else {}
                 extracted = client.extract_json(url, prompt, response_format, **extra)
             results.append({"url": url, "data": extracted})
         except FlareCrawlError as e:
@@ -1209,7 +1222,7 @@ def screenshot(
             if timeout:
                 kwargs["timeout"] = timeout
             if auth_dict:
-                kwargs["authenticate"] = auth_dict
+                kwargs.update(auth_dict)
             data = client.take_screenshot(url, **kwargs)
     except FlareCrawlError as e:
         _handle_api_error(e, json_output)
@@ -1274,7 +1287,7 @@ def pdf(
             if timeout:
                 kwargs["timeout"] = timeout
             if auth_dict:
-                kwargs["authenticate"] = auth_dict
+                kwargs.update(auth_dict)
             data = client.render_pdf(url, **kwargs)
     except FlareCrawlError as e:
         _handle_api_error(e, json_output)
@@ -1371,7 +1384,7 @@ def favicon(
         # Reject images/media/fonts to speed up — we only need HTML
         kwargs["reject_resources"] = ["image", "media", "font", "stylesheet"]
         if auth_dict:
-            kwargs["authenticate"] = auth_dict
+            kwargs.update(auth_dict)
         html = client.get_content(url, **kwargs)
     except FlareCrawlError as e:
         _handle_api_error(e, json_output)

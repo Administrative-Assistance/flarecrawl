@@ -249,6 +249,10 @@ class Client:
         if "authenticate" in kwargs:
             body["authenticate"] = kwargs.pop("authenticate")
 
+        # setExtraHTTPHeaders
+        if "extra_headers" in kwargs:
+            body["setExtraHTTPHeaders"] = kwargs.pop("extra_headers")
+
         # rejectResourceTypes
         if "reject_resources" in kwargs:
             body["rejectResourceTypes"] = kwargs.pop("reject_resources")
