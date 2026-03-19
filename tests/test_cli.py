@@ -27,7 +27,7 @@ class TestHelp:
     def test_version(self):
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "flarecrawl 0.6.0" in result.output
+        assert "flarecrawl 0.6.1" in result.output
 
     def test_status_flag(self):
         result = runner.invoke(app, ["--status"])
@@ -663,3 +663,15 @@ class TestNewV060Features:
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["data"]["content"]["ld_json"][0]["@type"] == "Organization"
+
+
+class TestBackupDir:
+    """Test --backup-dir flag."""
+
+    def test_scrape_has_backup_dir(self):
+        result = runner.invoke(app, ["scrape", "--help"])
+        assert "--backup-dir" in result.output
+
+    def test_download_has_backup_dir(self):
+        result = runner.invoke(app, ["download", "--help"])
+        assert "--backup-dir" in result.output

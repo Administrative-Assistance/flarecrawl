@@ -48,6 +48,7 @@
 | Process local HTML | `cat page.html \| flarecrawl scrape --stdin --json` |
 | Save HAR | `flarecrawl scrape URL --har output.har` |
 | Discover URLs (sitemap+feed+links) | `flarecrawl discover URL --json` |
+| Backup raw HTML | `flarecrawl scrape URL --backup-dir ./backup` |
 | Check usage | `flarecrawl usage --json` |
 | Auth status | `flarecrawl auth status --json` |
 | Cache status | `flarecrawl cache status --json` |

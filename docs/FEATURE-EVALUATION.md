@@ -220,7 +220,7 @@
 
 ### 16. `--backup-dir` — Save raw HTML alongside output
 
-**Status:** Evaluating | **Score:** 2.2 (Impact: 1, Effort: 3, Feasibility: 3)
+**Status:** Built (v0.6.1) | **Score:** 2.2 (Impact: 1, Effort: 3, Feasibility: 3)
 
 **The problem:** Extraction is lossy — once HTML is converted to markdown, the original structure is gone. If the extraction algorithm improves or users need different output later, they have to re-scrape everything.
 
@@ -264,6 +264,7 @@
 | 2026-03-19 | 4 | `--stdin` | **Built (v0.6.0)** | Local processing via extract.py, zero API calls |
 | 2026-03-19 | 5 | `flarecrawl discover` | **Built (v0.6.0)** | Combines sitemap + RSS/Atom + page links discovery |
 | 2026-03-19 | 13 | `--har` | **Built (v0.6.0)** | Lightweight version — request metadata only (CF doesn't expose full HAR) |
+| 2026-03-19 | 16 | `--backup-dir` | **Built (v0.6.1)** | Saves raw HTML alongside extracted output for archival/reprocessing |
 
 ---
 

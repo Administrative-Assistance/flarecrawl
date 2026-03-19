@@ -13,6 +13,7 @@ CLI that wraps Cloudflare's [Browser Rendering REST API](https://developers.clou
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **v0.6.1** | 2026-03-19 | `--backup-dir` for raw HTML archival, discover edge case fixes, 187 tests |
 | **v0.6.0** | 2026-03-19 | `--selector`, `--js-eval`, `--wait-for-selector`, `--stdin`, `--har`, `flarecrawl discover` command, 185 tests |
 | **v0.5.4** | 2026-03-19 | `--user-agent` on all commands for custom crawler identity or paywall bypass |
 | **v0.5.3** | 2026-03-19 | Guided `auth login` with browser auto-open for token setup |
@@ -230,6 +231,10 @@ curl https://example.com | flarecrawl scrape --stdin --format schema --json
 
 # Save request metadata to HAR file
 flarecrawl scrape https://example.com --har requests.har --json
+
+# Save raw HTML alongside output (for archival/reprocessing)
+flarecrawl scrape https://example.com --backup-dir ./html-backup
+flarecrawl download https://example.com --limit 20 --backup-dir ./html-backup
 ```
 
 ### URL discovery

@@ -700,6 +700,7 @@ def scrape(
     js_expression: Annotated[str | None, typer.Option("--js-eval", help="Run JS expression, return result")] = None,
     stdin_mode: Annotated[bool, typer.Option("--stdin", help="Read HTML from stdin (no API call)")] = False,
     har_output: Annotated[Path | None, typer.Option("--har", help="Save request metadata to HAR file")] = None,
+    backup_dir: Annotated[Path | None, typer.Option("--backup-dir", help="Save raw HTML to this directory")] = None,
 ):
     """Scrape one or more URLs. Default output is markdown.
 
@@ -952,6 +953,21 @@ def scrape(
                 r["diff"] = {"added": 0, "removed": 0, "diff": "(no cached version to compare)"}
             # Store current version for next diff
             _cache.put(endpoint + ":diff", cache_body, content_str)
+
+    # Backup: save raw HTML alongside output
+    if backup_dir and results:
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        for r in results:
+            page_url = r.get("url", "")
+            if not page_url:
+                continue
+            try:
+                html = client.get_content(page_url)
+                filename = _sanitize_filename(page_url) + ".html"
+                (backup_dir / filename).write_text(html, encoding="utf-8")
+            except FlareCrawlError:
+                pass
+        console.print(f"[dim]HTML backup saved to {backup_dir}/[/dim]")
 
     # HAR capture: save request metadata
     if har_output and results:
@@ -1310,6 +1326,7 @@ def download(
     exclude_tags: Annotated[str | None, typer.Option("--exclude-tags", help="CSS selectors to remove")] = None,
     include_tags: Annotated[str | None, typer.Option("--include-tags", help="CSS selectors to keep")] = None,
     user_agent: Annotated[str | None, typer.Option("--user-agent", help="Custom User-Agent string")] = None,
+    backup_dir: Annotated[Path | None, typer.Option("--backup-dir", help="Save raw HTML to this directory")] = None,
 ):
     """Download a site into .flarecrawl/ as files.
 
@@ -1400,6 +1417,15 @@ def download(
         filename = _sanitize_filename(page_url) + ext
         filepath = output_dir / filename
         filepath.write_text(content, encoding="utf-8")
+
+        # Backup raw HTML alongside extracted content
+        if backup_dir:
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            raw_html = record.get("html", "")
+            if raw_html:
+                (backup_dir / (_sanitize_filename(page_url) + ".html")).write_text(
+                    raw_html, encoding="utf-8",
+                )
         saved += 1
 
     summary = {
