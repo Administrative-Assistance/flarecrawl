@@ -218,3 +218,64 @@ class TestBrowserTimeTracking:
     def test_max_retries(self):
         client = Client(account_id="test-id", api_token="test-token")
         assert client.MAX_RETRIES == 3
+
+
+class TestHandleError:
+    """Test error handling and enrichment."""
+
+    def test_network_error_422_suggests_auth(self):
+        """CF 422 'Network error' should hint about --auth."""
+        from unittest.mock import MagicMock
+
+        from flarecrawl.client import FlareCrawlError
+
+        client = Client(account_id="test-id", api_token="test-token")
+        response = MagicMock()
+        response.status_code = 422
+        response.json.return_value = {
+            "errors": [{"message": "Network error when attempting to load page"}]
+        }
+        try:
+            client._handle_error(response)
+            assert False, "Should have raised"
+        except FlareCrawlError as e:
+            assert "--auth user:password" in str(e)
+            assert "--session cookies.json" in str(e)
+            assert e.status_code == 422
+
+    def test_network_error_non_422_no_hint(self):
+        """Non-422 network errors should not get the auth hint."""
+        from unittest.mock import MagicMock
+
+        from flarecrawl.client import FlareCrawlError
+
+        client = Client(account_id="test-id", api_token="test-token")
+        response = MagicMock()
+        response.status_code = 500
+        response.json.return_value = {
+            "errors": [{"message": "Network error when attempting to load page"}]
+        }
+        try:
+            client._handle_error(response)
+            assert False, "Should have raised"
+        except FlareCrawlError as e:
+            assert "--auth" not in str(e)
+
+    def test_non_network_422_no_hint(self):
+        """422 with a different message should not get the auth hint."""
+        from unittest.mock import MagicMock
+
+        from flarecrawl.client import FlareCrawlError
+
+        client = Client(account_id="test-id", api_token="test-token")
+        response = MagicMock()
+        response.status_code = 422
+        response.json.return_value = {
+            "errors": [{"message": "Invalid URL format"}]
+        }
+        try:
+            client._handle_error(response)
+            assert False, "Should have raised"
+        except FlareCrawlError as e:
+            assert "--auth" not in str(e)
+            assert "Invalid URL format" in str(e)

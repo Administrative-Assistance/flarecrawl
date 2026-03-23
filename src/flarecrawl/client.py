@@ -104,6 +104,13 @@ class Client:
             errors = data.get("errors", [])
             if errors:
                 message = errors[0].get("message", "Unknown error")
+                # Enrich unhelpful CF errors with actionable hints
+                if "network error" in message.lower() and status == 422:
+                    message += (
+                        ". This often means the site requires authentication"
+                        " — try --auth user:password for HTTP Basic Auth"
+                        " or --session cookies.json for cookie-based auth"
+                    )
                 raise FlareCrawlError(message, "API_ERROR", status)
         except (ValueError, KeyError):
             pass
